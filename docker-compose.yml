@@ -8,7 +8,7 @@ x-api-env: &api-env
   COOKIE_SECURE: ${COOKIE_SECURE:-false}
   BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
   BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
-  AI_PROVIDER_CLASSIFY: ${AI_PROVIDER_CLASSIFY:-ollama}
+  AI_PROVIDER_CLASSIFY: ${AI_PROVIDER_CLASSIFY:-anthropic}
   AI_PROVIDER_GENERATE: ${AI_PROVIDER_GENERATE:-anthropic}
   AI_PROVIDER_SENSITIVE: ${AI_PROVIDER_SENSITIVE:-ollama}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -46,6 +46,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    profiles: [local-ai]
     restart: unless-stopped
     volumes:
       - ollama:/root/.ollama
