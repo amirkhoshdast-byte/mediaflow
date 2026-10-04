@@ -1,0 +1,11 @@
+{
+  "name": "اتاق فرمان روایت",
+  "short_name": "اتاق فرمان",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1219",
+  "theme_color": "#185f8c",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
