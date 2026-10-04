@@ -18,13 +18,14 @@ with psycopg.connect(
 
 import pyotp  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 from app import models  # noqa: E402,F401
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.enums import Role  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import User  # noqa: E402
-from app.security import encrypt_secret, hash_password  # noqa: E402
+from app.security import decrypt_secret, encrypt_secret, hash_password  # noqa: E402
 
 PASSWORD = "test-password-123"
 
@@ -70,7 +71,13 @@ def login(client, make_user):
 
     def _login(role: Role, username: str | None = None) -> TestClient:
         username = username or f"u_{role.value}"
-        _, secret = make_user(username, role)
+        with SessionLocal() as db:
+            user = db.scalar(select(User).where(User.username == username))
+        if user:  # re-login as an existing user: reuse its TOTP secret
+            secret = decrypt_secret(user.totp_secret_enc)
+        else:
+            _, secret = make_user(username, role)
+        client.cookies.clear()
         r = client.post("/auth/login", json={"username": username, "password": PASSWORD})
         r = client.post(
             "/auth/totp",
@@ -80,3 +87,51 @@ def login(client, make_user):
         return client
 
     return _login
+
+
+# ---------- AI fakes ----------
+import json  # noqa: E402
+
+from app.ai import gateway as gw  # noqa: E402
+from app.ai.providers import Provider  # noqa: E402
+from app.celery_app import celery  # noqa: E402
+
+celery.conf.task_always_eager = True
+
+
+class FakeProvider(Provider):
+    def __init__(self, name: str, is_local: bool):
+        self.name, self.is_local = name, is_local
+        self.calls: list[tuple[str, str]] = []
+        self.analysis = {
+            "title": "عنوان آزمون",
+            "summary": "خلاصه آزمون.",
+            "category": "diplomacy",
+            "region": "اروپا",
+            "risk": "low",
+            "approach": "original_post",
+            "opportunity": "فرصت",
+            "sentiment": 0.2,
+        }
+
+    def complete(self, system, user, *, model, max_tokens):
+        self.calls.append((system, user))
+        if "Analyse this item" in user:
+            return "```json\n" + json.dumps(self.analysis) + "\n```"
+        return json.dumps(
+            {
+                "variants": [
+                    {"angle": f"زاویه {i}", "parts": [f"متن شماره {i} #تست"]} for i in range(1, 4)
+                ]
+            }
+        )
+
+
+@pytest.fixture(autouse=True)
+def fake_ai(monkeypatch):
+    providers = {
+        "ollama": FakeProvider("ollama", True),
+        "anthropic": FakeProvider("anthropic", False),
+    }
+    monkeypatch.setattr(gw, "_gateway", gw.AIGateway(providers=providers))
+    return providers

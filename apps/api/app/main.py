@@ -5,11 +5,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
+from app.ai.prompts import seed_prompts
 from app.config import get_settings
 from app.db import SessionLocal
 from app.enums import Role
 from app.models import User
-from app.routers import auth, users
+from app.routers import auth, drafts, meta, signals, users
 from app.security import hash_password
 
 log = logging.getLogger("ncr")
@@ -18,6 +19,7 @@ log = logging.getLogger("ncr")
 def bootstrap_admin() -> None:
     s = get_settings()
     with SessionLocal() as db:
+        seed_prompts(db)
         if db.scalar(select(func.count()).select_from(User)):
             return
         if not s.bootstrap_admin_password:
@@ -55,6 +57,9 @@ async def csrf_guard(request: Request, call_next):
 
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(signals.router)
+app.include_router(drafts.router)
+app.include_router(meta.router)
 
 
 @app.get("/health")
