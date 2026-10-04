@@ -1,0 +1,99 @@
+name: ncr
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ncr}:${POSTGRES_PASSWORD:-change-me-db}@db:5432/${POSTGRES_DB:-ncr}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  SECRET_KEY: ${SECRET_KEY}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  AI_PROVIDER_CLASSIFY: ${AI_PROVIDER_CLASSIFY:-ollama}
+  AI_PROVIDER_GENERATE: ${AI_PROVIDER_GENERATE:-anthropic}
+  AI_PROVIDER_SENSITIVE: ${AI_PROVIDER_SENSITIVE:-ollama}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+  OPENAI_COMPAT_BASE_URL: ${OPENAI_COMPAT_BASE_URL:-}
+  OPENAI_COMPAT_API_KEY: ${OPENAI_COMPAT_API_KEY:-}
+  OPENAI_COMPAT_MODEL: ${OPENAI_COMPAT_MODEL:-}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+  OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ncr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-db}
+      POSTGRES_DB: ${POSTGRES_DB:-ncr}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ncr}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  web:
+    build: ./apps/web
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  pgdata:
+  ollama:
+  caddy_data:
+  caddy_config:
