@@ -1,0 +1,30 @@
+# Isolated stack for Playwright: own DB, a stub AI server (openai_compatible), fresh admin.
+# Run: docker compose -p ncr-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d
+x-e2e-env: &e2e-env
+  AI_PROVIDER_CLASSIFY: openai_compatible
+  AI_PROVIDER_GENERATE: openai_compatible
+  OPENAI_COMPAT_BASE_URL: http://stub-ai:9099/v1
+  OPENAI_COMPAT_MODEL: stub
+  ANTHROPIC_API_KEY: ""
+  BOOTSTRAP_ADMIN_USERNAME: e2e-admin
+  BOOTSTRAP_ADMIN_PASSWORD: e2e-admin-password-1
+
+services:
+  stub-ai:
+    image: node:22-slim
+    command: ["node", "/stub/stub-ai.mjs"]
+    volumes:
+      - ./apps/web/e2e/stub-ai.mjs:/stub/stub-ai.mjs:ro
+  api:
+    image: ncr-api
+    environment: *e2e-env
+  worker:
+    image: ncr-worker
+    environment: *e2e-env
+  web:
+    image: ncr-web
+  caddy:
+    environment:
+      SITE_ADDRESS: ":80"
+    ports: !override
+      - "18080:80"
