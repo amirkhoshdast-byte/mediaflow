@@ -29,7 +29,8 @@ def test_duplicate_item_is_rejected(login):
 
 
 def test_failed_analysis_is_visible(login, fake_ai):
-    fake_ai["ollama"].analysis = None  # makes json.dumps -> "null" -> no JSON object
+    for provider in fake_ai.values():
+        provider.analysis = None  # makes json.dumps -> "null" -> no JSON object
     c = login(Role.TREND_ANALYST)
     sig = _signal(c)
     got = [s for s in c.get("/signals").json() if s["id"] == sig["id"]][0]
