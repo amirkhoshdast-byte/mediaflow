@@ -103,6 +103,7 @@ class FakeProvider(Provider):
     def __init__(self, name: str, is_local: bool):
         self.name, self.is_local = name, is_local
         self.calls: list[tuple[str, str]] = []
+        self.embed_calls: list[list[str]] = []
         self.analysis = {
             "title": "عنوان آزمون",
             "summary": "خلاصه آزمون.",
@@ -113,6 +114,10 @@ class FakeProvider(Provider):
             "opportunity": "فرصت",
             "sentiment": 0.2,
         }
+
+    def embed(self, texts):
+        self.embed_calls.append(texts)
+        return [[0.0, 1.0] for _ in texts]
 
     def complete(self, system, user, *, model, max_tokens):
         self.calls.append((system, user))

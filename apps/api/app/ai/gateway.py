@@ -22,6 +22,7 @@ from app.models import PromptTemplate
 TASK_SLOT = {
     "signal_analysis": "classify",
     "content_generation": "generate",
+    "embedding": "embed",
 }
 
 
@@ -110,6 +111,13 @@ class AIGateway:
             tpl.system_text, user, model=tpl.default_model, max_tokens=max_tokens
         )
         return AIResult(text=text, provider=provider.name, template_version=tpl.version)
+
+    def embed(
+        self, texts: list[str], *, sensitivity: Sensitivity = Sensitivity.NORMAL
+    ) -> tuple[list[list[float]], str]:
+        """Vectors for `texts` and the provider name. Sensitive text embeds locally only."""
+        provider = self.resolve_provider("embedding", sensitivity)
+        return provider.embed(texts), provider.name
 
 
 _gateway: AIGateway | None = None

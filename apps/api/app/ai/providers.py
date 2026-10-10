@@ -18,6 +18,9 @@ class Provider(ABC):
     @abstractmethod
     def complete(self, system: str, user: str, *, model: str | None, max_tokens: int) -> str: ...
 
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        raise ProviderError(f"{self.name} has no embeddings API")
+
 
 class AnthropicProvider(Provider):
     name = "anthropic"
@@ -56,6 +59,22 @@ class OpenAICompatibleProvider(Provider):
             s.openai_compat_model,
         )
         self.timeout = s.ai_timeout_seconds
+        self.embed_model = s.openai_compat_embed_model
+
+    def embed(self, texts):
+        if not self.base:
+            raise ProviderError("OPENAI_COMPAT_BASE_URL is not configured")
+        headers = {"Authorization": f"Bearer {self.key}"} if self.key else {}
+        r = httpx.post(
+            f"{self.base}/embeddings",
+            headers=headers,
+            timeout=self.timeout,
+            json={"model": self.embed_model, "input": texts},
+        )
+        if r.status_code >= 400:
+            raise ProviderError(f"openai_compatible HTTP {r.status_code}")
+        rows = sorted(r.json()["data"], key=lambda d: d["index"])
+        return [d["embedding"] for d in rows]
 
     def complete(self, system, user, *, model, max_tokens):
         if not self.base:
@@ -89,6 +108,20 @@ class OllamaProvider(Provider):
             s.ollama_model,
             s.ai_timeout_seconds,
         )
+        self.embed_model = s.ollama_embed_model
+
+    def embed(self, texts):
+        try:
+            r = httpx.post(
+                f"{self.base}/api/embed",
+                timeout=self.timeout,
+                json={"model": self.embed_model, "input": texts},
+            )
+        except httpx.HTTPError as e:
+            raise ProviderError(f"ollama unreachable: {e.__class__.__name__}") from e
+        if r.status_code >= 400:
+            raise ProviderError(f"ollama HTTP {r.status_code}")
+        return r.json()["embeddings"]
 
     def complete(self, system, user, *, model, max_tokens):
         try:

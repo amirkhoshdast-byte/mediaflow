@@ -63,3 +63,63 @@ def test_extract_json_from_fenced_and_prose():
     assert extract_json('blah {"a": {"b": 2}} blah') == {"a": {"b": 2}}
     with pytest.raises(ValueError):
         extract_json("no json")
+
+
+# ---------- embeddings ----------
+
+
+def test_sensitive_embedding_never_reaches_cloud_provider(fake_ai):
+    gw = _gateway(fake_ai, ai_provider_sensitive="anthropic", ai_provider_embed="anthropic")
+    with pytest.raises(SensitiveRoutingError):
+        gw.embed(["classified"], sensitivity=Sensitivity.SENSITIVE)
+    assert fake_ai["anthropic"].embed_calls == []
+
+
+def test_sensitive_embedding_ignores_a_cloud_embed_slot(fake_ai):
+    # The embed slot may point at a cloud provider for normal text; sensitive text still goes local.
+    gw = _gateway(fake_ai, ai_provider_embed="anthropic")
+    vectors, provider = gw.embed(["classified"], sensitivity=Sensitivity.SENSITIVE)
+    assert provider == "ollama" and len(vectors) == 1
+    assert fake_ai["anthropic"].embed_calls == []
+
+
+def test_normal_embedding_follows_the_embed_slot(fake_ai):
+    _, provider = _gateway(fake_ai, ai_provider_embed="anthropic").embed(["a", "b"])
+    assert provider == "anthropic"
+    assert fake_ai["anthropic"].embed_calls == [["a", "b"]]
+
+
+def test_provider_without_embeddings_api_fails_clearly():
+    from app.ai.providers import AnthropicProvider, ProviderError
+
+    with pytest.raises(ProviderError, match="no embeddings API"):
+        AnthropicProvider(Settings(secret_key="x")).embed(["x"])
+
+
+def test_ollama_and_openai_compatible_embed_over_http(monkeypatch):
+    import httpx
+
+    from app.ai.providers import OllamaProvider, OpenAICompatibleProvider
+
+    sent = []
+
+    def fake_post(url, **kw):
+        sent.append((url, kw["json"]))
+        body = (
+            {"embeddings": [[1.0], [2.0]]}
+            if url.endswith("/api/embed")
+            else {"data": [{"index": 1, "embedding": [2.0]}, {"index": 0, "embedding": [1.0]}]}
+        )
+        return httpx.Response(200, json=body)
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    s = Settings(
+        secret_key="x",
+        ollama_base_url="http://o:11434",
+        openai_compat_base_url="http://c/v1",
+        openai_compat_embed_model="emb",
+    )
+    assert OllamaProvider(s).embed(["a", "b"]) == [[1.0], [2.0]]
+    assert OpenAICompatibleProvider(s).embed(["a", "b"]) == [[1.0], [2.0]]  # re-ordered by index
+    assert sent[0] == ("http://o:11434/api/embed", {"model": "bge-m3", "input": ["a", "b"]})
+    assert sent[1][1] == {"model": "emb", "input": ["a", "b"]}
