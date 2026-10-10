@@ -79,6 +79,10 @@ export const ERROR_FA: Record<string, string> = {
   duplicate: "این خبر قبلاً ثبت شده است.",
   forbidden: "دسترسی مجاز نیست.",
   username_taken: "این نام کاربری قبلاً استفاده شده است.",
+  unsupported_file_type: "قالب فایل پشتیبانی نمی‌شود (txt، md، pdf یا docx).",
+  file_too_large: "حجم فایل بیش از ۱۰ مگابایت است.",
+  empty_document: "متنی در فایل پیدا نشد.",
+  unreadable_file: "فایل خوانده نشد؛ ممکن است خراب باشد.",
 };
 export const faError = (e: unknown): string => {
   const d = (e as { detail?: unknown })?.detail;
@@ -87,4 +91,19 @@ export const faError = (e: unknown): string => {
   if (typeof code === "string" && code.startsWith("generation_failed"))
     return "تولید محتوا ناموفق بود؛ تنظیمات ارائه‌دهنده هوش مصنوعی را بررسی کنید.";
   return "خطایی رخ داد. دوباره تلاش کنید.";
+};
+
+export const DOC_TYPE_FA: Record<string, string> = {
+  identity: "هویتی",
+  communication: "ارتباطی",
+  strategic: "راهبردی",
+};
+export const SENSITIVITY_FA: Record<string, string> = {
+  normal: "عادی",
+  sensitive: "حساس (فقط مدل محلی)",
+};
+export const DOC_STATUS_FA: Record<string, string> = {
+  processing: "در حال پردازش…",
+  ready: "آماده",
+  failed: "ناموفق",
 };

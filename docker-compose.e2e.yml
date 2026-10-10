@@ -5,6 +5,11 @@ x-e2e-env: &e2e-env
   AI_PROVIDER_GENERATE: openai_compatible
   OPENAI_COMPAT_BASE_URL: http://stub-ai:9099/v1
   OPENAI_COMPAT_MODEL: stub
+  OPENAI_COMPAT_EMBED_MODEL: stub-embed
+  AI_PROVIDER_EMBED: openai_compatible
+  # No local model in this stack: sensitive documents must fail closed.
+  AI_PROVIDER_SENSITIVE: ollama
+  OLLAMA_BASE_URL: http://unreachable.invalid:11434
   ANTHROPIC_API_KEY: ""
   BOOTSTRAP_ADMIN_USERNAME: e2e-admin
   BOOTSTRAP_ADMIN_PASSWORD: e2e-admin-password-1

@@ -27,27 +27,37 @@ async function userPage(browser: Browser, username: string, password: string) {
     locale: "fa-IR",
   });
   const page = await ctx.newPage();
-  await signIn(page, username, password);
+  await signIn(page, username, PASSWORD);
   return page;
 }
 
-test("signal → draft → approval → published", async ({ browser, page }) => {
-  // --- admin creates the two working roles ---
+const PASSWORD = "e2e-user-password-1";
+
+// The admin enrols 2FA once; every later test only needs the accounts created here.
+test.beforeAll(async ({ browser }) => {
+  const ctx = await browser.newContext({
+    baseURL: test.info().project.use.baseURL,
+    locale: "fa-IR",
+  });
+  const page = await ctx.newPage();
   await signIn(page, ADMIN.username, ADMIN.password);
-  const password = "e2e-user-password-1";
   for (const [username, role] of [
     ["e2e-lead", "content_lead"],
     ["e2e-editor", "diplomatic_editor"],
+    ["e2e-operator", "ai_operator"],
   ]) {
     const r = await page.request.post("/api/admin/users", {
       headers: { "x-ncr": "1" },
-      data: { username, display_name: username, password, role },
+      data: { username, display_name: username, password: PASSWORD, role },
     });
     expect(r.status()).toBe(201);
   }
+  await ctx.close();
+});
 
+test("signal → draft → approval → published", async ({ browser }) => {
   // --- content lead: paste news → analysed signal within 30 s ---
-  const lead = await userPage(browser, "e2e-lead", password);
+  const lead = await userPage(browser, "e2e-lead", PASSWORD);
   await lead.getByRole("textbox", { name: "متن خبر یا توییت" }).fill(NEWS);
   await lead.getByRole("button", { name: "افزودن و تحلیل" }).click();
   await expect(
@@ -74,7 +84,7 @@ test("signal → draft → approval → published", async ({ browser, page }) =>
   await expect(card.getByRole("button", { name: "تأیید" })).toHaveCount(0);
 
   // --- diplomatic editor approves ---
-  const editor = await userPage(browser, "e2e-editor", password);
+  const editor = await userPage(browser, "e2e-editor", PASSWORD);
   const queue = editor.getByRole("region", { name: "صف انتشار" });
   await queue
     .getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" })
@@ -99,4 +109,38 @@ test("signal → draft → approval → published", async ({ browser, page }) =>
       .getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" })
       .getByRole("button", { name: "ثبت انتشار" }),
   ).toHaveCount(0);
+});
+
+test("knowledge base: upload, search, and sensitive documents fail closed", async ({ browser }) => {
+  const op = await userPage(browser, "e2e-operator", PASSWORD);
+  await op.getByRole("link", { name: "پایگاه دانش" }).click();
+  await expect(op.getByRole("heading", { name: "پایگاه دانش", level: 1 })).toBeVisible();
+
+  const upload = async (name: string, text: string, sensitivity: string) => {
+    await op.locator('input[type="file"]').setInputFiles({
+      name: `${name}.txt`,
+      mimeType: "text/plain",
+      buffer: Buffer.from(text),
+    });
+    await op.getByLabel("طبقه حساسیت").first().selectOption(sensitivity);
+    await op.getByRole("button", { name: "بارگذاری سند" }).click();
+  };
+
+  await upload("identity", "تمدن ایرانی بر گفت‌وگو و حافظه مشترک بنا شده است.", "normal");
+  const docs = op.getByRole("list", { name: "اسناد" });
+  await expect(docs.getByText("آماده")).toBeVisible({ timeout: 20_000 });
+
+  await op
+    .getByRole("searchbox", { name: "جست‌وجو" })
+    .or(op.getByLabel("جست‌وجو"))
+    .fill("حافظه مشترک");
+  await op.getByRole("button", { name: "جست‌وجو" }).click();
+  await expect(
+    op.getByRole("region", { name: "نتایج جست‌وجو" }).getByText("identity.txt"),
+  ).toBeVisible();
+
+  // This stack has no local model, so a sensitive document must fail instead of going to the cloud.
+  await upload("secret", "پروتکل داخلی بحران: تماس با دفتر رئیس.", "sensitive");
+  await expect(docs.getByText("ناموفق")).toBeVisible({ timeout: 20_000 });
+  await expect(docs.getByText("آماده")).toHaveCount(1);
 });

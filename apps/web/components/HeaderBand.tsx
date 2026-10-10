@@ -120,6 +120,9 @@ export function HeaderBand({
           <span className="text-sm">
             {me.display_name} <span className="text-muted">· {ROLE_FA[me.role]}</span>
           </span>
+          <Link href="/knowledge" className="btn">
+            پایگاه دانش
+          </Link>
           {me.permissions.includes("users:manage") && (
             <Link href="/admin" className="btn">
               مدیریت
