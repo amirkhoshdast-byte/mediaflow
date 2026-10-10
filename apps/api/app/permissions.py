@@ -15,6 +15,8 @@ class Perm(StrEnum):
     APPROVE_LOW_MEDIUM = "approve:low_medium"
     APPROVE_HIGH_CRITICAL = "approve:high_critical"
     PROMPTS_MANAGE = "prompts:manage"
+    KB_MANAGE = "kb:manage"
+    KB_READ_SENSITIVE = "kb:read_sensitive"
     USERS_MANAGE = "users:manage"
     AUDIT_VIEW = "audit:view"
 
@@ -23,7 +25,7 @@ R = Role
 PERMISSIONS: dict[Role, set[Perm]] = {
     R.TREND_ANALYST: {Perm.SOURCES_MANAGE, Perm.SIGNAL_ADD},
     R.MEDIA_MONITOR: {Perm.SIGNAL_ADD},
-    R.AI_OPERATOR: {Perm.PROMPTS_MANAGE},
+    R.AI_OPERATOR: {Perm.PROMPTS_MANAGE, Perm.KB_MANAGE, Perm.KB_READ_SENSITIVE},
     R.CONTENT_LEAD: {Perm.SIGNAL_ADD, Perm.DRAFT_EDIT, Perm.DRAFT_SUBMIT, Perm.DRAFT_PUBLISH},
     R.NARRATIVE_STRATEGIST: {Perm.SIGNAL_ADD, Perm.DRAFT_EDIT, Perm.DRAFT_PUBLISH},
     R.DIPLOMATIC_EDITOR: {
@@ -35,6 +37,7 @@ PERMISSIONS: dict[Role, set[Perm]] = {
         Perm.DRAFT_LOWER_RISK,
         Perm.APPROVE_LOW_MEDIUM,
         Perm.APPROVE_HIGH_CRITICAL,
+        Perm.KB_READ_SENSITIVE,
         Perm.AUDIT_VIEW,
     },
     # System admin manages users/settings but can never approve content.

@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.enums import Role
 from app.models import User
-from app.routers import auth, drafts, meta, signals, users
+from app.routers import auth, drafts, knowledge, meta, signals, users
 from app.security import hash_password
 
 log = logging.getLogger("ncr")
@@ -60,6 +60,7 @@ app.include_router(users.router)
 app.include_router(signals.router)
 app.include_router(drafts.router)
 app.include_router(meta.router)
+app.include_router(knowledge.router)
 
 
 @app.get("/health")

@@ -65,3 +65,15 @@ class Sensitivity(StrEnum):
 class Decision(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
+
+
+class DocType(StrEnum):
+    IDENTITY = "identity"
+    COMMUNICATION = "communication"
+    STRATEGIC = "strategic"
+
+
+class DocStatus(StrEnum):
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
