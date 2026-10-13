@@ -212,3 +212,21 @@ class RedLine(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = _ts()
+
+
+class ToneReview(Base):
+    """Tone and red-line check of one draft text. Rule findings are stored at once; the model's
+    judgement is added by a worker task, so `status` is analyzing until then."""
+
+    __tablename__ = "tone_reviews"
+    id: Mapped[str] = _id()
+    draft_id: Mapped[str] = mapped_column(ForeignKey("drafts.id", ondelete="CASCADE"), index=True)
+    parts_hash: Mapped[str] = mapped_column(String(64))
+    parts_snapshot: Mapped[list] = mapped_column(JSON)  # the exact text that was reviewed
+    status: Mapped[str] = mapped_column(String(16), default="analyzing")
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0..100
+    issues: Mapped[list] = mapped_column(JSON, default=list)
+    suggested_parts: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = _ts()

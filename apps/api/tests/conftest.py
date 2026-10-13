@@ -119,6 +119,7 @@ class FakeProvider(Provider):
         self.name, self.is_local = name, is_local
         self.calls: list[tuple[str, str]] = []
         self.embed_calls: list[list[str]] = []
+        self.review: dict | Exception = {"score": 82, "issues": [], "suggested_parts": None}
         self.analysis = {
             "title": "عنوان آزمون",
             "summary": "خلاصه آزمون.",
@@ -136,6 +137,10 @@ class FakeProvider(Provider):
 
     def complete(self, system, user, *, model, max_tokens):
         self.calls.append((system, user))
+        if "Review this draft" in user:
+            if isinstance(self.review, Exception):
+                raise self.review
+            return json.dumps(self.review)
         if "Analyse this item" in user:
             return "```json\n" + json.dumps(self.analysis) + "\n```"
         return json.dumps(

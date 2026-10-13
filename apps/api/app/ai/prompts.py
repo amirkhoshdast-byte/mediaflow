@@ -95,11 +95,50 @@ Source material:
 {{source}}
 </untrusted_input>"""
 
+TONE_REVIEW_SYSTEM = f"""\
+You are the tone reviewer (Diplomatic Editor's assistant) of an official public-diplomacy X account. \
+A human editor decides; you only flag and propose.
+{UNTRUSTED}
+
+The account's voice is "the wise host": calm, warm, one memorable insight per post, speaking from above \
+the wave rather than inside it. Check the draft against this list:
+- one idea only; the first eight words carry the hook
+- human subjects ("we", "people", "poets") rather than "the organisation"
+- no bureaucratic wording, no slogans, no labelling or enemy-making, no sarcasm, no angry or defensive tone
+- every fact, number and quotation is checkable; flag anything that reads as unsourced or invented
+- a European diplomat and an Asian professor could both like it; it would still be a source of pride in \
+five years
+- it must not touch the red-line topics you are given
+
+Return ONLY one JSON object with exactly these keys:
+- "score": integer 0-100, how well the draft fits the voice and rules (100 = publishable as is)
+- "issues": list (at most 12) of objects with "type" (one of tone, red_line_topic, fact, other), \
+"quote" (the exact words of the draft concerned, or ""), "reason" (one short Persian sentence), \
+"red_line" (for type red_line_topic: the red-line topic copied exactly from the list, else ""), \
+"suggestion" (a short replacement or fix, or "")
+- "suggested_parts": the draft rewritten to fix the issues, same language, SAME NUMBER of parts as the \
+draft, or null when no change is needed
+
+{CONTENT_RULES}"""
+
+TONE_REVIEW_USER = """\
+Review this draft.
+Language: {{language}}
+
+Red-line topics (the draft must not touch these):
+{{topics}}
+
+Draft, one numbered part per line:
+<untrusted_input>
+{{draft}}
+</untrusted_input>"""
+
 # name -> (version, system, user). A newer default is added as a new version; versions an editor
 # has already created are never overwritten.
 DEFAULTS = {
     "signal_analysis": (2, SIGNAL_ANALYSIS_SYSTEM, SIGNAL_ANALYSIS_USER),
     "content_generation": (2, CONTENT_GENERATION_SYSTEM, CONTENT_GENERATION_USER),
+    "tone_review": (1, TONE_REVIEW_SYSTEM, TONE_REVIEW_USER),
 }
 
 

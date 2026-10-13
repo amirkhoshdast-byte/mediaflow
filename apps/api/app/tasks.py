@@ -10,7 +10,17 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.enums import DocStatus, Sensitivity, SignalStatus
 from app.ingest import ingest_all, ingest_source
-from app.models import EMBED_DIM, KnowledgeChunk, KnowledgeDoc, Signal, Source
+from app.models import (
+    EMBED_DIM,
+    Draft,
+    KnowledgeChunk,
+    KnowledgeDoc,
+    RedLine,
+    Signal,
+    Source,
+    ToneReview,
+)
+from app.tone import clean_model_review, draft_for_prompt, topics_for_prompt
 
 log = logging.getLogger("ncr.tasks")
 
@@ -91,3 +101,36 @@ def ingest_one(source_id: str) -> int:
     for signal_id in created:
         analyze_signal.delay(signal_id)
     return len(created)
+
+
+@celery.task(name="tone.review_draft")
+def review_draft(review_id: str) -> None:
+    """Add the model's judgement to a review that already holds the rule findings."""
+    with SessionLocal() as db:
+        review = db.get(ToneReview, review_id)
+        draft = db.get(Draft, review.draft_id) if review else None
+        if not review or not draft:
+            return
+        try:
+            red_lines = list(db.scalars(select(RedLine).where(RedLine.active.is_(True))))
+            result = get_gateway().run(
+                db,
+                "tone_review",
+                {
+                    "language": draft.language,
+                    "topics": topics_for_prompt(red_lines),
+                    "draft": draft_for_prompt(review.parts_snapshot),
+                },
+                max_tokens=1500,
+            )
+            parsed = clean_model_review(
+                extract_json(result.text), red_lines, len(review.parts_snapshot)
+            )
+            review.issues = [*review.issues, *parsed["issues"]]
+            review.score, review.suggested_parts = parsed["score"], parsed["suggested_parts"]
+            review.provider, review.status, review.error = result.provider, "ready", None
+        except Exception as e:  # noqa: BLE001 - rule findings stay available even if the model fails
+            log.exception("tone review failed")
+            review.status = "failed"
+            review.error = f"{e.__class__.__name__}: {str(e)[:300]}"
+        db.commit()

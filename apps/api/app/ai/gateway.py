@@ -22,6 +22,7 @@ from app.models import PromptTemplate
 TASK_SLOT = {
     "signal_analysis": "classify",
     "content_generation": "generate",
+    "tone_review": "generate",
     "embedding": "embed",
 }
 

@@ -17,8 +17,10 @@ from app.db import get_db
 from app.deps import current_user, require
 from app.enums import RISK_ORDER, Decision, DraftFormat, RiskLevel, Stage
 from app.knowledge import format_positions, retrieve_positions
-from app.models import Approval, Draft, DraftVersion, Signal, User
+from app.models import Approval, Draft, DraftVersion, RedLine, Signal, ToneReview, User
 from app.permissions import Perm, can_approve, has_perm
+from app.tasks import review_draft
+from app.tone import parts_hash, rule_issues
 
 log = logging.getLogger("ncr.drafts")
 router = APIRouter(tags=["drafts"])
@@ -260,6 +262,8 @@ def transition(
 
     d.stage = dst.value
     db.commit()
+    if (src, dst) == (Stage.DRAFT, Stage.TONE_REVIEW):
+        _start_review(db, d)
     return serialize_draft(d)
 
 
@@ -290,3 +294,59 @@ def history(draft_id: str, _: User = Depends(current_user), db: Session = Depend
             for a in approvals
         ],
     }
+
+
+# ---------- Tone review ----------
+
+
+def _start_review(db: Session, d: Draft) -> ToneReview:
+    """Rule findings are stored now; the model's judgement follows from a worker task."""
+    red_lines = list(db.scalars(select(RedLine).where(RedLine.active.is_(True))))
+    review = ToneReview(
+        draft_id=d.id,
+        parts_hash=parts_hash(d.parts),
+        parts_snapshot=list(d.parts),
+        issues=rule_issues(d.parts, d.language, red_lines),
+    )
+    db.add(review)
+    db.commit()
+    review_draft.delay(review.id)
+    db.refresh(review)
+    return review
+
+
+def serialize_review(r: ToneReview, d: Draft) -> dict:
+    return {
+        "id": r.id,
+        "status": r.status,
+        "score": r.score,
+        "issues": r.issues,
+        "suggested_parts": r.suggested_parts,
+        "error": r.error,
+        "stale": r.parts_hash != parts_hash(d.parts),  # the draft was edited after this review
+        "created_at": r.created_at.isoformat(),
+    }
+
+
+@router.get("/drafts/{draft_id}/review")
+def get_review(
+    draft_id: str, _: User = Depends(current_user), db: Session = Depends(get_db)
+) -> dict:
+    d = _get(db, draft_id)
+    r = db.scalar(
+        select(ToneReview).where(ToneReview.draft_id == d.id).order_by(ToneReview.created_at.desc())
+    )
+    if not r:
+        raise HTTPException(404, "no_review")
+    return serialize_review(r, d)
+
+
+@router.post("/drafts/{draft_id}/review", status_code=201)
+def rerun_review(
+    draft_id: str, user: User = Depends(require(Perm.DRAFT_EDIT)), db: Session = Depends(get_db)
+) -> dict:
+    d = _get(db, draft_id)
+    if d.stage not in (Stage.DRAFT.value, Stage.TONE_REVIEW.value):
+        raise HTTPException(409, "review_only_before_approval")
+    audit.log(db, user.id, "draft.review_requested", "draft", d.id)
+    return serialize_review(_start_review(db, d), d)
