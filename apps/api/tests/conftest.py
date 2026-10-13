@@ -105,6 +105,7 @@ class FakeProvider(Provider):
         self.calls: list[tuple[str, str]] = []
         self.review: dict | Exception = {"score": 82, "issues": [], "suggested_parts": None}
         self.brief: str | Exception = "خلاصه آزمون برای این بازه."
+        self.generation_error: Exception | None = None
         self.analysis = {
             "title": "عنوان آزمون",
             "summary": "خلاصه آزمون.",
@@ -128,6 +129,8 @@ class FakeProvider(Provider):
             return json.dumps(self.review)
         if "Analyse this item" in user:
             return "```json\n" + json.dumps(self.analysis) + "\n```"
+        if self.generation_error:
+            raise self.generation_error
         return json.dumps(
             {
                 "variants": [

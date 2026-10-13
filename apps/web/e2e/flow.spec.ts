@@ -245,3 +245,15 @@ test("high-risk drafts are labelled, get their own tab and need an explicit yes"
   await expect(item.getByRole("button", { name: "لغو تأیید" })).toBeVisible(); // now approved
   expect(asked).toContain("پرریسک");
 });
+
+test("a highly relevant signal arrives with three automatic drafts", async ({ browser }) => {
+  const owner = await userPage(browser, "e2e-strategist", PASSWORD);
+  await owner
+    .getByRole("textbox", { name: "متن خبر یا توییت" })
+    .fill(
+      "AUTO-DRAFT: regional mediation talks resumed this week with new proposals on cultural heritage protection.",
+    );
+  await owner.getByRole("button", { name: "افزودن و تحلیل" }).click();
+  const queue = owner.getByRole("region", { name: "صف انتشار" });
+  await expect(queue.getByText("پیشنهاد خودکار")).toHaveCount(3, { timeout: 45_000 });
+});

@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     ingest_undated_per_run: int = 5  # feeds without dates would otherwise replay their archive
     gdelt_min_interval_seconds: float = 6.0  # GDELT answers 429 to faster callers
 
+    # Automatic first drafts for the most relevant signals
+    auto_draft_enabled: bool = True
+    auto_draft_min_relevance: int = 70
+    auto_draft_max_per_day: int = 10
+    auto_draft_language: str = "en"
+
     # Daily targets shown in the header band
     target_posts_per_day: int = 3
     target_replies_per_day: int = 5

@@ -53,6 +53,7 @@ export interface Draft {
   persona: string;
   pillar: string;
   angle: string | null;
+  auto: boolean;
   generation_group: string | null;
   parts: string[];
   stage: Stage;

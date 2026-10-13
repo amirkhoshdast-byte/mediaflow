@@ -11,7 +11,8 @@ Shared content rules (always apply):
 - Tone: calm, deep, civilizational, precise, global, warm, never bureaucratic.
 - Forbidden: reactive/angry wording, defensive language, slogans, personal feuds, unsourced claims, \
 fabricated quotes or statistics.
-- On military, security and judicial topics the default stance is "monitor only" or "strategic silence".
+- Military, security, judicial and sensitive political topics: write with extra care, neutral and factual, \
+with no escalation, accusation or taunting. The draft is marked high risk and needs the owner's explicit approval.
 - Each tweet is at most 270 characters, uses at most one hashtag, and contains no emoji.
 """
 
@@ -49,7 +50,8 @@ disasters. Engage with wisdom, appreciation, invitation to dialogue.
 - yellow: war damage to heritage, Islamophobia and media imagery, multilateral meetings (UNESCO, UN), \
 migration and identity, human impact of crises. Engage only with a cultural/human frame.
 - red: military operations, security accusations and court cases, negotiation details, other countries' \
-domestic politics, elections, personal feuds. Do not engage: monitor_only or strategic_silence.
+domestic politics, elections, personal feuds. The recommended stance is monitor_only or strategic_silence, \
+but a draft is still prepared (always high risk) and the owner decides.
 - rebuttal: the item contains a checkable false or misleading claim about Iran, its people, culture or \
 heritage. Say in "opportunity" which verifiable fact could correct it. Never invent facts.
 
@@ -148,10 +150,10 @@ Items from the period (headline, zone, risk, region):
 # name -> (version, system, user). A newer default is added as a new version; versions an editor
 # has already created are never overwritten.
 DEFAULTS = {
-    "signal_analysis": (2, SIGNAL_ANALYSIS_SYSTEM, SIGNAL_ANALYSIS_USER),
-    "content_generation": (3, CONTENT_GENERATION_SYSTEM, CONTENT_GENERATION_USER),
-    "tone_review": (1, TONE_REVIEW_SYSTEM, TONE_REVIEW_USER),
-    "daily_brief": (2, DAILY_BRIEF_SYSTEM, DAILY_BRIEF_USER),
+    "signal_analysis": (3, SIGNAL_ANALYSIS_SYSTEM, SIGNAL_ANALYSIS_USER),
+    "content_generation": (4, CONTENT_GENERATION_SYSTEM, CONTENT_GENERATION_USER),
+    "tone_review": (2, TONE_REVIEW_SYSTEM, TONE_REVIEW_USER),
+    "daily_brief": (3, DAILY_BRIEF_SYSTEM, DAILY_BRIEF_USER),
 }
 
 

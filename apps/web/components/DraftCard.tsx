@@ -88,6 +88,7 @@ export function DraftCard({
         {showStage && (
           <span className="badge border-accent text-accent">{STAGE_FA[draft.stage]}</span>
         )}
+        {draft.auto && <span className="badge border-accent text-accent">پیشنهاد خودکار</span>}
         {draft.angle && <span className="text-muted">{draft.angle}</span>}
       </div>
 

@@ -30,6 +30,7 @@ def serialize_draft(d: Draft) -> dict:
         "persona": d.persona,
         "pillar": d.pillar,
         "angle": d.angle,
+        "auto": d.created_by is None,
         "generation_group": d.generation_group,
         "parts": d.parts,
         "stage": d.stage,

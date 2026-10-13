@@ -8,7 +8,7 @@ const analysis = {
   region: "اروپا",
   risk: "low",
   zone: "green",
-  relevance: 80,
+  relevance: 60, // below the automatic-drafting bar, so ordinary tests make no drafts of their own
   approach: "original_post",
   opportunity: "تحلیل آرام درباره ثبات سیاست پولی",
   sentiment: 0.1,
@@ -71,7 +71,9 @@ createServer((req, res) => {
           ? reviewRedLine
           : review
         : user.includes("Analyse this item")
-          ? analysis
+          ? user.includes("AUTO-DRAFT")
+            ? { ...analysis, relevance: 90 }
+            : analysis
           : variants;
     const content = typeof answer === "string" ? answer : JSON.stringify(answer);
     res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content } }] }));

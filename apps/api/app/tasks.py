@@ -47,6 +47,26 @@ def analyze_signal(signal_id: str) -> None:
             signal.status = SignalStatus.FAILED.value
             signal.error = f"{e.__class__.__name__}: {str(e)[:300]}"
         db.commit()
+        if signal.status == SignalStatus.READY.value:
+            draft_for_signal.delay(
+                signal.id
+            )  # separate task: drafting trouble never fails analysis
+
+
+@celery.task(name="drafts.auto_for_signal")
+def draft_for_signal(signal_id: str) -> int:
+    from app.studio import auto_draft_signal  # studio imports this module for review tasks
+
+    with SessionLocal() as db:
+        signal = db.get(Signal, signal_id)
+        if not signal:
+            return 0
+        try:
+            return len(auto_draft_signal(db, signal, get_settings()))
+        except Exception:  # noqa: BLE001 - the signal stays usable; the owner can draft by hand
+            log.exception("automatic drafting failed")
+            db.rollback()
+            return 0
 
 
 @celery.task(name="ingest.run_all")
