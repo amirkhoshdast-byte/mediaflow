@@ -14,6 +14,20 @@ const analysis = {
   sentiment: 0.1,
 };
 
+const review = {
+  score: 88,
+  issues: [
+    {
+      type: "tone",
+      quote: "",
+      reason: "لحن مناسب است؛ قلاب می‌تواند قوی‌تر باشد.",
+      red_line: "",
+      suggestion: "",
+    },
+  ],
+  suggested_parts: null,
+};
+
 const longTweet = "متن آزمایشی بلند ".repeat(20).trim(); // > 280 chars on purpose
 const variants = {
   variants: [
@@ -52,7 +66,12 @@ createServer((req, res) => {
       return res.end(JSON.stringify({ data }));
     }
     const user = payload.messages?.at(-1)?.content ?? "";
-    const content = JSON.stringify(user.includes("Analyse this item") ? analysis : variants);
+    const answer = user.includes("Review this draft")
+      ? review
+      : user.includes("Analyse this item")
+        ? analysis
+        : variants;
+    const content = JSON.stringify(answer);
     res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content } }] }));
   });
 }).listen(9099, "0.0.0.0");

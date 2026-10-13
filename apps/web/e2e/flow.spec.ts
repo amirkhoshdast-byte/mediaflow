@@ -88,6 +88,9 @@ test("signal → draft → approval → published", async ({ browser }) => {
   const card = studio.getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" });
   await card.getByRole("button", { name: "ارسال به بازبینی" }).click();
   await expect(card.getByText("در انتظار ویراستار دیپلماتیک")).toBeVisible();
+  const reviewPanel = card.getByRole("region", { name: "بررسی لحن" });
+  await expect(reviewPanel.getByText("امتیاز ۸۸")).toBeVisible();
+  await expect(reviewPanel.getByText("قلاب می‌تواند قوی‌تر باشد")).toBeVisible();
   await expect(card.getByRole("button", { name: "تأیید" })).toHaveCount(0);
 
   // --- diplomatic editor approves ---

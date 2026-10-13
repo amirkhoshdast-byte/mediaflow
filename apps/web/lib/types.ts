@@ -131,3 +131,22 @@ export interface Source {
   last_fetched_at: string | null;
   last_error: string | null;
 }
+
+export interface ToneIssue {
+  source: "rule" | "model";
+  type:
+    "red_line_phrase" | "red_line_topic" | "office_language" | "format" | "tone" | "fact" | "other";
+  quote: string | null;
+  reason: string;
+  severity: Risk | null;
+  suggestion: string | null;
+}
+export interface ToneReview {
+  id: string;
+  status: "analyzing" | "ready" | "failed";
+  score: number | null;
+  issues: ToneIssue[];
+  suggested_parts: string[] | null;
+  error: string | null;
+  stale: boolean;
+}

@@ -132,3 +132,13 @@ export const ZONE_CLASS: Record<string, string> = {
   red: "border-danger text-danger",
   rebuttal: "border-accent text-accent",
 };
+
+export const ISSUE_TYPE_FA: Record<string, string> = {
+  red_line_phrase: "عبارت خط قرمز",
+  red_line_topic: "موضوع خط قرمز",
+  office_language: "زبان اداری",
+  format: "قالب",
+  tone: "لحن",
+  fact: "واقعیت و منبع",
+  other: "نکته",
+};

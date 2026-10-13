@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { FORMAT_FA, LANG_FA, RISK_CLASS, RISK_FA, STAGE_FA, faError } from "@/lib/labels";
 import type { Draft, Me, Meta, Risk, Stage } from "@/lib/types";
+import { ToneReviewPanel } from "./ToneReviewPanel";
 
 const fa = (n: number) => n.toLocaleString("fa-IR");
 
@@ -105,6 +106,19 @@ export function DraftCard({
           </div>
         );
       })}
+
+      {draft.stage === "tone_review" && (
+        <ToneReviewPanel
+          draft={draft}
+          canApply={editable}
+          onApply={(suggested) =>
+            window.confirm(
+              "پس از اعمال پیشنهاد، پیش‌نویس به مرحله ویرایش برمی‌گردد و باید دوباره برای بازبینی ارسال شود. ادامه می‌دهید؟",
+            ) &&
+            call(() => api(`/drafts/${draft.id}`, { method: "PATCH", body: { parts: suggested } }))
+          }
+        />
+      )}
 
       <div className="flex flex-wrap gap-1 text-xs">
         {draft.checks.too_many_hashtags && (
