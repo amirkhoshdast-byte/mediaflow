@@ -14,22 +14,21 @@ def _audit(action):
 
 
 def test_starter_list_is_seeded_from_the_voice_guide(login):
-    rows = login(Role.CONTENT_LEAD).get("/redlines").json()
+    rows = login(Role.ASSISTANT).get("/redlines").json()
     assert len(rows) == len(STARTER)
     assert {"عملیات نظامی", "انتخابات"} <= {r["pattern"] for r in rows}
     assert all(r["active"] for r in rows)
 
 
-def test_everyone_may_read_but_only_reviewers_may_change(login):
-    for role in (Role.CONTENT_LEAD, Role.AI_OPERATOR, Role.SYSADMIN, Role.NARRATIVE_STRATEGIST):
+def test_everyone_may_read_but_only_the_owner_may_change(login):
+    for role in (Role.ASSISTANT, Role.SYSADMIN):
         assert login(role).post("/redlines", json=NEW).status_code == 403
-    for role in (Role.DIPLOMATIC_EDITOR, Role.PRESIDENT_OFFICE):
-        c = login(role)
-        assert c.post("/redlines", json={**NEW, "pattern": f"x-{role.value}"}).status_code == 201
+    assert login(Role.ASSISTANT).get("/redlines").status_code == 200
+    assert login(Role.OWNER).post("/redlines", json=NEW).status_code == 201
 
 
 def test_every_change_is_audited_with_before_and_after(login):
-    c = login(Role.DIPLOMATIC_EDITOR)
+    c = login(Role.OWNER)
     rid = c.post("/redlines", json=NEW).json()["id"]
     c.patch(f"/redlines/{rid}", json={"severity": "critical", "active": False})
     c.delete(f"/redlines/{rid}")
@@ -41,7 +40,7 @@ def test_every_change_is_audited_with_before_and_after(login):
 
 
 def test_duplicates_and_bad_input_are_rejected(login):
-    c = login(Role.PRESIDENT_OFFICE)
+    c = login(Role.OWNER)
     assert c.post("/redlines", json=NEW).status_code == 201
     assert c.post("/redlines", json=NEW).status_code == 409
     assert c.post("/redlines", json={**NEW, "severity": "extreme"}).status_code == 422
@@ -50,7 +49,7 @@ def test_duplicates_and_bad_input_are_rejected(login):
 
 
 def test_seeding_never_restores_what_reviewers_removed(login):
-    c = login(Role.DIPLOMATIC_EDITOR)
+    c = login(Role.OWNER)
     for r in c.get("/redlines").json():
         c.delete(f"/redlines/{r['id']}")
     with SessionLocal() as db:

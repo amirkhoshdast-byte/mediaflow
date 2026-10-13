@@ -1,12 +1,7 @@
 // Persian UI strings for server-side enums.
 export const ROLE_FA: Record<string, string> = {
-  trend_analyst: "تحلیلگر روند",
-  media_monitor: "رصدگر رسانه",
-  ai_operator: "اپراتور هوش مصنوعی",
-  content_lead: "مسئول محتوا",
-  narrative_strategist: "راهبر روایت",
-  diplomatic_editor: "ویراستار دیپلماتیک",
-  president_office: "دفتر رئیس",
+  owner: "مدیر حساب",
+  assistant: "دستیار",
   sysadmin: "مدیر سامانه",
 };
 export const RISK_FA: Record<string, string> = {
@@ -85,6 +80,8 @@ export const ERROR_FA: Record<string, string> = {
   red_line_exists: "این مورد قبلاً در فهرست خطوط قرمز هست.",
   rss_needs_http_url: "برای RSS آدرس http یا https لازم است.",
   gdelt_needs_query: "برای GDELT عبارت جست‌وجو لازم است.",
+  x_needs_username: "نام کاربری X نامعتبر است (فقط حروف انگلیسی، عدد و _ تا ۱۵ نویسه).",
+  source_exists: "این منبع قبلاً اضافه شده است.",
   username_taken: "این نام کاربری قبلاً استفاده شده است.",
 };
 export const faError = (e: unknown): string => {

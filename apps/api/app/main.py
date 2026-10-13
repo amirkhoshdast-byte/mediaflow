@@ -44,7 +44,7 @@ def bootstrap_admin() -> None:
                 username=s.bootstrap_admin_username,
                 display_name="مدیر سامانه",
                 password_hash=hash_password(s.bootstrap_admin_password),
-                role=Role.SYSADMIN.value,
+                role=Role.OWNER.value,
             )
         )
         db.commit()

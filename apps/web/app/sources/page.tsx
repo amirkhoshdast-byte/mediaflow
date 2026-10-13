@@ -14,7 +14,7 @@ export default function Sources() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [rows, setRows] = useState<Source[]>([]);
-  const [type, setType] = useState<"rss" | "gdelt">("rss");
+  const [type, setType] = useState<"rss" | "gdelt" | "x">("rss");
   const [error, setError] = useState("");
   const canManage = !!me?.permissions.includes("sources:manage");
 
@@ -53,7 +53,7 @@ export default function Sources() {
           type,
           name: f.name,
           language: f.language,
-          ...(type === "rss" ? { url: f.target } : { query: f.target }),
+          ...(type === "rss" ? { url: f.target } : { query: f.target }), // GDELT query or X username
         },
       });
       form.reset();
@@ -69,8 +69,9 @@ export default function Sources() {
         </Link>
       </div>
       <p className="text-sm text-muted">
-        فقط رسانه‌ها و منابع عمومی خوانده می‌شوند، هر ۱۵ دقیقه. رویترز و AP خوراک عمومی ندارند و از
-        طریق GDELT رصد می‌شوند. خطای هر منبع همین‌جا دیده می‌شود.
+        فقط رسانه‌ها و حساب‌های عمومی (رسانه‌ها، نهادها، مقام‌ها) خوانده می‌شوند، هر ۱۵ دقیقه؛
+        حساب‌های عادی نه. منبع X به کلید `X_BEARER_TOKEN` در `.env` نیاز دارد. رویترز و AP خوراک
+        عمومی ندارند و از طریق GDELT رصد می‌شوند. خطای هر منبع همین‌جا دیده می‌شود.
       </p>
 
       {error && (
@@ -85,17 +86,24 @@ export default function Sources() {
             className="input"
             aria-label="نوع منبع"
             value={type}
-            onChange={(e) => setType(e.target.value as "rss" | "gdelt")}
+            onChange={(e) => setType(e.target.value as "rss" | "gdelt" | "x")}
           >
             <option value="rss">RSS</option>
             <option value="gdelt">GDELT (عبارت جست‌وجو)</option>
+            <option value="x">حساب X (عمومی)</option>
           </select>
           <input name="name" required minLength={2} placeholder="نام منبع" className="input" />
           <input
             name="target"
             required
             dir="ltr"
-            placeholder={type === "rss" ? "https://example.com/rss.xml" : "Iran domain:reuters.com"}
+            placeholder={
+              type === "rss"
+                ? "https://example.com/rss.xml"
+                : type === "x"
+                  ? "UNESCO (بدون @)"
+                  : "Iran domain:reuters.com"
+            }
             className="input sm:col-span-2"
           />
           <select name="language" className="input" defaultValue="en" aria-label="زبان">
@@ -113,7 +121,7 @@ export default function Sources() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{s.name}</span>
               <span className="badge border-line text-muted">
-                {s.type === "rss" ? "RSS" : "GDELT"}
+                {s.type === "rss" ? "RSS" : s.type === "x" ? "X" : "GDELT"}
               </span>
               {!s.active && <span className="badge border-line text-muted">غیرفعال</span>}
               <span className="text-xs text-muted">آخرین دریافت: {when(s.last_fetched_at)}</span>

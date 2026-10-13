@@ -192,8 +192,8 @@ def test_public_address_is_allowed(monkeypatch):
 
 
 def test_starter_sources_are_seeded_once_and_never_restored(login):
-    assert len(login(Role.TREND_ANALYST).get("/sources").json()) == len(STARTER)
-    c = login(Role.TREND_ANALYST)
+    assert len(login(Role.ASSISTANT).get("/sources").json()) == len(STARTER)
+    c = login(Role.ASSISTANT)
     for s in c.get("/sources").json():
         c.delete(f"/sources/{s['id']}")
     with SessionLocal() as db:
@@ -203,13 +203,15 @@ def test_starter_sources_are_seeded_once_and_never_restored(login):
 
 def test_only_source_managers_change_sources(login):
     body = {"type": "rss", "name": "Test feed", "url": "https://t.example/rss"}
-    assert login(Role.CONTENT_LEAD).post("/sources", json=body).status_code == 403
-    assert login(Role.CONTENT_LEAD).get("/sources").status_code == 200
-    assert login(Role.TREND_ANALYST).post("/sources", json=body).status_code == 201
+    assert login(Role.SYSADMIN).post("/sources", json=body).status_code == 403
+    assert login(Role.SYSADMIN).get("/sources").status_code == 200
+    assert (
+        login(Role.ASSISTANT).post("/sources", json=body).status_code == 201
+    )  # assistants curate sources
 
 
 def test_source_input_is_validated_and_changes_are_audited(login):
-    c = login(Role.TREND_ANALYST)
+    c = login(Role.ASSISTANT)
     assert (
         c.post("/sources", json={"type": "rss", "name": "x1", "url": "ftp://t.example"}).status_code
         == 422
@@ -226,7 +228,7 @@ def test_source_input_is_validated_and_changes_are_audited(login):
 
 def test_fetch_now_runs_and_analyses_new_items(login, feeds, fake_ai):
     feeds["https://t.example/rss"] = _rss(("خبر تازه", "https://t.example/1", NOW))
-    c = login(Role.TREND_ANALYST)
+    c = login(Role.ASSISTANT)
     sid = c.post(
         "/sources", json={"type": "rss", "name": "Test feed", "url": "https://t.example/rss"}
     ).json()["id"]
@@ -291,3 +293,76 @@ def test_gdelt_calls_are_spaced(feeds, monkeypatch):
         feeds[ingest.gdelt_url("Iran")] = b'{"articles": []}'
         ingest.ingest_all(db, _settings(gdelt_min_interval_seconds=6))
     assert len(sleeps) == 2 and all(0 < s <= 6 for s in sleeps)
+
+
+# ---------- X accounts ----------
+
+TIMELINE = {
+    "data": [
+        {
+            "id": "111",
+            "text": "Dialogue is the oldest bridge.",
+            "created_at": "2026-10-13T08:00:00.000Z",
+        },
+        {"id": "112", "text": "A second post", "created_at": "2026-10-13T09:00:00.000Z"},
+    ]
+}
+
+
+def _x_source(db, username="UNESCO"):
+    s = Source(type="x", name=f"@{username}", query=username)
+    db.add(s)
+    db.commit()
+    return s
+
+
+def test_x_without_a_token_reports_a_clear_error_instead_of_fetching():
+    with SessionLocal() as db:
+        s = _x_source(db)
+        assert ingest.ingest_source(db, s, _settings(), 10) == []
+        assert "X_BEARER_TOKEN" in db.get(Source, s.id).last_error
+
+
+def test_x_posts_become_signals_and_the_user_id_is_looked_up_once(monkeypatch):
+    calls = []
+
+    def fake(url, token, *, params=None):
+        calls.append((url, params))
+        assert token == "tok"
+        return {"data": {"id": "42"}} if "/by/username/" in url else TIMELINE
+
+    monkeypatch.setattr(ingest, "fetch_json", fake)
+    cfg = _settings(x_bearer_token="tok", ingest_max_age_hours=24 * 3650)
+    with SessionLocal() as db:
+        s = _x_source(db)
+        ids = ingest.ingest_source(db, s, cfg, 10)
+        assert len(ids) == 2
+        item = db.get(Signal, ids[0]).raw_item
+        assert item.url == "https://x.com/UNESCO/status/111" and item.text.startswith("Dialogue")
+        ingest.ingest_source(db, s, cfg, 10)
+        assert db.get(Source, s.id).external_id == "42"
+    assert sum("/by/username/" in c[0] for c in calls) == 1
+    assert calls[1][1]["exclude"] == "retweets,replies"  # original posts only
+
+
+def test_an_unknown_x_account_is_an_error_on_the_source(monkeypatch):
+    monkeypatch.setattr(ingest, "fetch_json", lambda *a, **k: {"errors": [{"title": "Not Found"}]})
+    with SessionLocal() as db:
+        s = _x_source(db, "nobody_here")
+        ingest.ingest_source(db, s, _settings(x_bearer_token="tok"), 10)
+        assert "not found" in db.get(Source, s.id).last_error
+
+
+def test_assistants_add_x_accounts_with_validation(login):
+    c = login(Role.ASSISTANT)
+    ok = c.post("/sources", json={"type": "x", "name": "UNESCO", "query": "@UNESCO"})
+    assert ok.status_code == 201 and ok.json()["query"] == "UNESCO"
+    assert (
+        c.post("/sources", json={"type": "x", "name": "again", "query": "UNESCO"}).status_code
+        == 409
+    )
+    for bad in ["", "has space", "x" * 16, "https://x.com/a"]:
+        assert (
+            c.post("/sources", json={"type": "x", "name": "bad one", "query": bad}).status_code
+            == 422
+        )

@@ -1,3 +1,4 @@
+import re
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,8 @@ from app.enums import SourceType
 from app.models import Source, User
 from app.permissions import Perm
 from app.tasks import ingest_one
+
+X_USERNAME = re.compile(r"[A-Za-z0-9_]{1,15}")
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -69,13 +72,20 @@ def create_source(
     elif body.type == SourceType.GDELT:
         if not body.query:
             raise HTTPException(422, "gdelt_needs_query")
+    elif body.type == SourceType.X:
+        username = (body.query or "").strip().lstrip("@")
+        if not X_USERNAME.fullmatch(username):
+            raise HTTPException(422, "x_needs_username")
+        if db.scalar(select(Source.id).where(Source.type == "x", Source.query == username)):
+            raise HTTPException(409, "source_exists")
+        body.query = username
     else:
         raise HTTPException(422, "source_type_not_supported")
     s = Source(
         type=body.type.value,
         name=body.name.strip(),
         url=body.url if body.type == SourceType.RSS else None,
-        query=body.query if body.type == SourceType.GDELT else None,
+        query=body.query if body.type in (SourceType.GDELT, SourceType.X) else None,
         language=body.language,
         domain=body.domain,
     )

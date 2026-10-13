@@ -180,7 +180,7 @@ def transition(
     src, dst = Stage(d.stage), body.to
 
     if (src, dst) == (Stage.DRAFT, Stage.APPROVED):
-        if not can_approve(user.role, d.risk):
+        if not can_approve(user.role):
             raise HTTPException(403, "approval_level_insufficient")
         if d.risk in HIGH and not body.confirm_high_risk:
             raise HTTPException(409, "high_risk_needs_confirmation")
@@ -200,7 +200,7 @@ def transition(
 
     elif (src, dst) == (Stage.APPROVED, Stage.DRAFT):
         # Withdrawing an approval is recorded like any other decision.
-        if not (can_approve(user.role, d.risk) or has_perm(user.role, Perm.DRAFT_EDIT)):
+        if not (can_approve(user.role) or has_perm(user.role, Perm.DRAFT_EDIT)):
             raise HTTPException(403, "forbidden")
         db.add(
             Approval(

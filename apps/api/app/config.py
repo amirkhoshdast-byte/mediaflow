@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b-instruct"
 
     # Automatic ingestion (RSS / GDELT). Caps bound model spend if a feed floods.
+    # X API (app-only bearer token). Without it X sources report an error instead of fetching.
+    x_bearer_token: str = ""
+
     ingest_enabled: bool = True
     ingest_interval_seconds: int = 900
     ingest_max_age_hours: int = 24

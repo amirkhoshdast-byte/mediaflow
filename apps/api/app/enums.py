@@ -2,14 +2,9 @@ from enum import StrEnum
 
 
 class Role(StrEnum):
-    TREND_ANALYST = "trend_analyst"
-    MEDIA_MONITOR = "media_monitor"
-    AI_OPERATOR = "ai_operator"
-    CONTENT_LEAD = "content_lead"
-    NARRATIVE_STRATEGIST = "narrative_strategist"
-    DIPLOMATIC_EDITOR = "diplomatic_editor"
-    PRESIDENT_OFFICE = "president_office"
-    SYSADMIN = "sysadmin"
+    OWNER = "owner"  # the account owner: every action, including approval
+    ASSISTANT = "assistant"  # prepares material; never approves or publishes
+    SYSADMIN = "sysadmin"  # users and audit only; never touches content
 
 
 class RiskLevel(StrEnum):

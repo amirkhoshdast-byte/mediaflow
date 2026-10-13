@@ -27,7 +27,7 @@ def _analysis(fake_ai, **kw):
 
 
 def _add(login, text=NEWS):
-    c = login(Role.TREND_ANALYST)
+    c = login(Role.ASSISTANT)
     return c.post("/signals", json={"text": text}).json()["id"]
 
 
@@ -43,7 +43,7 @@ def test_a_relevant_signal_gets_three_automatic_drafts(login, fake_ai):
     assert len(drafts) == 3 and {d.signal_id for d in drafts} == {sid}
     assert all(d.created_by is None and d.language == "en" and d.stage == "draft" for d in drafts)
     assert {d.pillar for d in drafts} == {"economy_development"}
-    assert all(d["auto"] for d in login(Role.CONTENT_LEAD).get("/drafts").json())
+    assert all(d["auto"] for d in login(Role.ASSISTANT).get("/drafts").json())
 
 
 def test_below_the_relevance_bar_nothing_is_drafted(login, fake_ai):
@@ -85,7 +85,7 @@ def test_security_topics_are_drafted_too_and_arrive_as_high_risk(login, fake_ai)
     _add(login)
     drafts = _drafts()
     assert len(drafts) == 3 and {d.risk for d in drafts} == {"high"}
-    lead = login(Role.CONTENT_LEAD)
+    lead = login(Role.ASSISTANT)
     assert {d["risk"] for d in lead.get("/drafts").json()} == {"high"}
 
 
@@ -93,7 +93,7 @@ def test_drafting_trouble_never_fails_the_analysis(login, fake_ai):
     _analysis(fake_ai)
     fake_ai["anthropic"].generation_error = RuntimeError("model down")
     sid = _add(login)
-    c = login(Role.CONTENT_LEAD)
+    c = login(Role.ASSISTANT)
     sig = next(s for s in c.get("/signals").json() if s["id"] == sid)
     assert sig["status"] == "ready" and _drafts() == []
 

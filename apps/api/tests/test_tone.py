@@ -79,7 +79,7 @@ def test_rewrite_must_keep_the_shape_of_the_draft():
 
 
 def _generated(login, topic="گفت‌وگوی تمدن‌ها"):
-    lead = login(Role.CONTENT_LEAD)
+    lead = login(Role.ASSISTANT)
     first = lead.post("/studio/generate", json={"topic": topic}).json()[0]
     return lead, first["id"]
 
@@ -105,7 +105,7 @@ def test_every_generated_draft_is_reviewed_automatically(login, fake_ai):
         ],
         "suggested_parts": None,
     }
-    lead = login(Role.CONTENT_LEAD)
+    lead = login(Role.ASSISTANT)
     drafts = lead.post("/studio/generate", json={"topic": "گفت‌وگوی تمدن‌ها"}).json()
     assert len(drafts) == 3
     for d in drafts:
@@ -132,10 +132,10 @@ def test_a_red_line_phrase_in_an_edit_escalates_at_once_without_the_model(login,
     assert _draft_json(lead, did)["risk"] == "medium"
     lead.patch(f"/drafts/{did}", json={"parts": ["ما محکوم می‌کنیم این کار را"]})
     assert _draft_json(lead, did)["risk"] == "medium"  # a phrase red line here is medium severity
-    editor = login(Role.DIPLOMATIC_EDITOR)
+    editor = login(Role.OWNER)
     rid = next(r["id"] for r in editor.get("/redlines").json() if r["pattern"] == "محکوم می‌کنیم")
     editor.patch(f"/redlines/{rid}", json={"severity": "critical"})
-    lead = login(Role.CONTENT_LEAD)
+    lead = login(Role.ASSISTANT)
     lead.patch(f"/drafts/{did}", json={"parts": ["ما محکوم می‌کنیم این کار را دوباره"]})
     assert _draft_json(lead, did)["risk"] == "critical"
 
@@ -149,7 +149,7 @@ def test_risk_never_goes_down_by_review(login, fake_ai):
 
 def test_escalation_after_approval_voids_the_approval(login, fake_ai):
     lead, did = _generated(login)
-    editor = login(Role.DIPLOMATIC_EDITOR)
+    editor = login(Role.OWNER)
     assert editor.post(f"/drafts/{did}/transition", json={"to": "approved"}).status_code == 200
     fake_ai["anthropic"].review = {
         "score": 50,
@@ -178,7 +178,7 @@ def test_editing_makes_the_old_review_stale_until_the_new_one_arrives(login):
 
 
 def test_inactive_red_lines_are_ignored(login, fake_ai):
-    editor = login(Role.DIPLOMATIC_EDITOR)
+    editor = login(Role.OWNER)
     rid = next(r["id"] for r in editor.get("/redlines").json() if r["pattern"] == "محکوم می‌کنیم")
     editor.patch(f"/redlines/{rid}", json={"active": False})
     lead, did = _generated(login)
@@ -187,7 +187,7 @@ def test_inactive_red_lines_are_ignored(login, fake_ai):
 
 
 def test_review_prompt_lists_only_active_topics_and_wraps_the_draft(login, fake_ai):
-    editor = login(Role.DIPLOMATIC_EDITOR)
+    editor = login(Role.OWNER)
     rid = next(r["id"] for r in editor.get("/redlines").json() if r["pattern"] == "انتخابات")
     editor.patch(f"/redlines/{rid}", json={"active": False})
     lead, did = _generated(login)
@@ -200,11 +200,11 @@ def test_review_prompt_lists_only_active_topics_and_wraps_the_draft(login, fake_
 def test_rerun_needs_edit_rights_and_is_blocked_after_publication(login):
     lead, did = _generated(login)
     assert lead.post(f"/drafts/{did}/review").status_code == 201
-    assert login(Role.AI_OPERATOR).post(f"/drafts/{did}/review").status_code == 403
-    editor = login(Role.DIPLOMATIC_EDITOR)
+    assert login(Role.SYSADMIN).post(f"/drafts/{did}/review").status_code == 403
+    editor = login(Role.OWNER)
     editor.post(f"/drafts/{did}/transition", json={"to": "approved"})
-    login(Role.CONTENT_LEAD).post(f"/drafts/{did}/transition", json={"to": "published"})
-    assert login(Role.CONTENT_LEAD).post(f"/drafts/{did}/review").status_code == 409
+    editor.post(f"/drafts/{did}/transition", json={"to": "published"})
+    assert login(Role.ASSISTANT).post(f"/drafts/{did}/review").status_code == 409
 
 
 def test_unknown_draft_is_404(login):

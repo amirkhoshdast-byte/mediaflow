@@ -5,7 +5,7 @@ from tests.conftest import PASSWORD
 
 
 def test_password_alone_never_opens_a_session(client, make_user):
-    make_user("amir", Role.CONTENT_LEAD)
+    make_user("amir", Role.ASSISTANT)
     r = client.post("/auth/login", json={"username": "amir", "password": PASSWORD})
     assert r.json()["status"] == "totp_required"
     assert "ncr_session" not in client.cookies
@@ -13,7 +13,7 @@ def test_password_alone_never_opens_a_session(client, make_user):
 
 
 def test_totp_login_sets_session(client, make_user):
-    _, secret = make_user("amir", Role.CONTENT_LEAD)
+    _, secret = make_user("amir", Role.ASSISTANT)
     tok = client.post("/auth/login", json={"username": "amir", "password": PASSWORD}).json()
     r = client.post(
         "/auth/totp",
@@ -21,12 +21,12 @@ def test_totp_login_sets_session(client, make_user):
     )
     assert r.status_code == 200
     me = client.get("/auth/me").json()
-    assert me["role"] == "content_lead"
-    assert "draft:edit" in me["permissions"] and "draft:submit" not in me["permissions"]
+    assert me["role"] == "assistant"
+    assert "draft:edit" in me["permissions"] and "draft:approve" not in me["permissions"]
 
 
 def test_wrong_totp_rejected(client, make_user):
-    make_user("amir", Role.CONTENT_LEAD)
+    make_user("amir", Role.ASSISTANT)
     tok = client.post("/auth/login", json={"username": "amir", "password": PASSWORD}).json()
     r = client.post(
         "/auth/totp", json={"challenge_token": tok["challenge_token"], "code": "000000"}
@@ -36,7 +36,7 @@ def test_wrong_totp_rejected(client, make_user):
 
 
 def test_first_login_requires_enrollment(client, make_user):
-    make_user("new", Role.TREND_ANALYST, enrolled=False)
+    make_user("new", Role.ASSISTANT, enrolled=False)
     tok = client.post("/auth/login", json={"username": "new", "password": PASSWORD}).json()
     assert tok["status"] == "enroll_required"
     # Enrollment token cannot be used as a TOTP challenge
@@ -59,7 +59,7 @@ def test_first_login_requires_enrollment(client, make_user):
 
 
 def test_lock_after_five_failures(client, make_user):
-    make_user("amir", Role.CONTENT_LEAD)
+    make_user("amir", Role.ASSISTANT)
     for _ in range(5):
         assert (
             client.post("/auth/login", json={"username": "amir", "password": "bad"}).status_code
@@ -74,14 +74,14 @@ def test_csrf_header_required(make_user):
 
     from app.main import app
 
-    make_user("amir", Role.CONTENT_LEAD)
+    make_user("amir", Role.ASSISTANT)
     with TestClient(app) as bare:
         r = bare.post("/auth/login", json={"username": "amir", "password": PASSWORD})
         assert r.status_code == 403
 
 
 def test_admin_endpoints_only_for_sysadmin(login):
-    c = login(Role.CONTENT_LEAD)
+    c = login(Role.ASSISTANT)
     assert c.get("/admin/users").status_code == 403
     assert c.post("/admin/users", json={}).status_code == 403
 
@@ -94,7 +94,7 @@ def test_sysadmin_creates_user_and_audit_logged(login):
             "username": "editor1",
             "display_name": "E",
             "password": "long-enough-pass",
-            "role": "diplomatic_editor",
+            "role": "assistant",
         },
     )
     assert r.status_code == 201

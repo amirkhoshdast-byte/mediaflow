@@ -145,10 +145,10 @@ def test_brief_prompt_holds_only_period_items_inside_the_data_block(login, fake_
 
 
 def test_everyone_but_the_sysadmin_and_inactive_users_is_notified(login, fake_ai, make_user):
-    make_user("lead", Role.CONTENT_LEAD)
-    make_user("boss", Role.PRESIDENT_OFFICE)
+    make_user("lead", Role.ASSISTANT)
+    make_user("boss", Role.OWNER)
     make_user("admin2", Role.SYSADMIN)
-    make_user("gone", Role.CONTENT_LEAD)
+    make_user("gone", Role.ASSISTANT)
     with SessionLocal() as db:
         db.execute(select(User))
         for u in db.scalars(select(User).where(User.username == "gone")):
@@ -157,21 +157,22 @@ def test_everyone_but_the_sysadmin_and_inactive_users_is_notified(login, fake_ai
         r = generate_report(db, _gateway(fake_ai), CFG, "morning", now=NOW)
         names = {db.get(User, n.user_id).username for n in db.scalars(select(Notification))}
         assert {n.link for n in db.scalars(select(Notification))} == {f"/reports/{r.id}"}
-    assert names == {"lead", "boss"}
+    # the bootstrap admin is an owner, so it is a recipient as well
+    assert {"lead", "boss"} <= names and not names & {"admin2", "gone"}
 
 
 # ---------- API ----------
 
 
 def test_manual_run_needs_the_report_permission(login):
-    assert login(Role.CONTENT_LEAD).post("/reports/generate").status_code == 403
-    r = login(Role.TREND_ANALYST).post("/reports/generate")
+    assert login(Role.ASSISTANT).post("/reports/generate").status_code == 403
+    r = login(Role.OWNER).post("/reports/generate")
     assert r.status_code == 201 and r.json()["slot"] == "manual" and r.json()["brief"]
 
 
 def test_reports_are_readable_by_any_signed_in_user(login, client):
-    rid = login(Role.PRESIDENT_OFFICE).post("/reports/generate").json()["id"]
-    c = login(Role.MEDIA_MONITOR)
+    rid = login(Role.OWNER).post("/reports/generate").json()["id"]
+    c = login(Role.ASSISTANT)
     assert [r["id"] for r in c.get("/reports").json()] == [rid]
     assert c.get(f"/reports/{rid}").json()["content"]["counts"]["signals"] == 0
     assert c.get("/reports/missing").status_code == 404
@@ -180,16 +181,16 @@ def test_reports_are_readable_by_any_signed_in_user(login, client):
 
 
 def test_notifications_can_be_read_and_belong_to_their_owner(login, make_user):
-    make_user("u_content_lead", Role.CONTENT_LEAD)  # recipients must exist when the report runs
-    make_user("u_diplomatic_editor", Role.DIPLOMATIC_EDITOR)
-    login(Role.TREND_ANALYST).post("/reports/generate")  # notifies everyone but the sysadmin
-    c = login(Role.CONTENT_LEAD)
+    make_user("u_assistant", Role.ASSISTANT)  # recipients must exist when the report runs
+    make_user("u_owner", Role.OWNER)
+    login(Role.OWNER).post("/reports/generate")  # notifies everyone but the sysadmin
+    c = login(Role.ASSISTANT)
     box = c.get("/notifications").json()
     assert box["unread"] == 1 and box["items"][0]["link"].startswith("/reports/")
     nid = box["items"][0]["id"]
     assert c.post(f"/notifications/{nid}/read").json()["read"] is True
     assert c.get("/notifications").json()["unread"] == 0
-    other = login(Role.DIPLOMATIC_EDITOR)
+    other = login(Role.OWNER)
     assert other.post(f"/notifications/{nid}/read").status_code == 404  # not theirs
     assert other.post("/notifications/read-all").json() == {"unread": 0}
     assert other.get("/notifications").json()["unread"] == 0

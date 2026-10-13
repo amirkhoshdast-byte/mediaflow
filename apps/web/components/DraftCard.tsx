@@ -34,10 +34,6 @@ export function DraftCard({
   useEffect(() => setParts(draft.parts), [draft.parts, draft.updated_at]);
 
   const editable = can("draft:edit") && draft.stage !== "published";
-  const approveLevel =
-    draft.risk === "high" || draft.risk === "critical"
-      ? "approve:high_critical"
-      : "approve:low_medium";
 
   async function call(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -166,7 +162,7 @@ export function DraftCard({
           {copied ? "کپی شد" : "کپی"}
         </button>
 
-        {draft.stage === "draft" && can(approveLevel) && (
+        {draft.stage === "draft" && can("draft:approve") && (
           <button
             className="btn btn-primary"
             disabled={busy}
@@ -183,10 +179,8 @@ export function DraftCard({
             تأیید انتشار
           </button>
         )}
-        {draft.stage === "draft" && !can(approveLevel) && (
-          <span className="text-xs text-muted">
-            {highRisk ? "تأیید پرریسک با نقش دارای دسترسی" : "در انتظار تأیید"}
-          </span>
+        {draft.stage === "draft" && !can("draft:approve") && (
+          <span className="text-xs text-muted">در انتظار تأیید مدیر حساب</span>
         )}
         {draft.stage === "approved" && can("draft:publish") && (
           <button
@@ -199,7 +193,7 @@ export function DraftCard({
             ثبت انتشار
           </button>
         )}
-        {draft.stage === "approved" && (can(approveLevel) || can("draft:edit")) && (
+        {draft.stage === "approved" && (can("draft:approve") || can("draft:edit")) && (
           <button
             className="btn"
             disabled={busy}

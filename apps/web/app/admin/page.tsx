@@ -76,7 +76,7 @@ export default function Admin() {
           dir="ltr"
           autoComplete="new-password"
         />
-        <select name="role" className="input" defaultValue="content_lead" aria-label="نقش">
+        <select name="role" className="input" defaultValue="assistant" aria-label="نقش">
           {Object.entries(ROLE_FA).map(([k, v]) => (
             <option key={k} value={k}>
               {v}

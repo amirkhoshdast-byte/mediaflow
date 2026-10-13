@@ -161,7 +161,58 @@ def parse_gdelt(content: bytes) -> list[Entry]:
     return out
 
 
-def entries_for(source: Source) -> list[Entry]:
+X_API = "https://api.x.com/2"
+X_TIMELINE_ITEMS = 20
+
+
+def fetch_json(url: str, token: str, *, params: dict | None = None) -> dict:
+    r = httpx.get(
+        url,
+        params=params,
+        timeout=20.0,
+        headers={"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT},
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+def x_entries(source: Source, settings: Settings) -> list[Entry]:
+    """Recent original posts of one public account (no replies, no reposts)."""
+    if not settings.x_bearer_token:
+        raise ValueError("X_BEARER_TOKEN is not configured")
+    username = source.query or ""
+    if not source.external_id:  # looked up once; the id never changes
+        found = fetch_json(f"{X_API}/users/by/username/{username}", settings.x_bearer_token)
+        source.external_id = (found.get("data") or {}).get("id")
+        if not source.external_id:
+            raise ValueError(f"X account @{username} was not found")
+    timeline = fetch_json(
+        f"{X_API}/users/{source.external_id}/tweets",
+        settings.x_bearer_token,
+        params={
+            "max_results": X_TIMELINE_ITEMS,
+            "tweet.fields": "created_at",
+            "exclude": "retweets,replies",
+        },
+    )
+    out = []
+    for t in timeline.get("data") or []:
+        text = _clean(t.get("text", ""))
+        if text:
+            out.append(
+                Entry(
+                    text,
+                    "",
+                    f"https://x.com/{username}/status/{t['id']}",
+                    _parse_date(t.get("created_at", "")),
+                )
+            )
+    return out
+
+
+def entries_for(source: Source, settings: Settings) -> list[Entry]:
+    if source.type == SourceType.X.value:
+        return x_entries(source, settings)
     if source.type == SourceType.GDELT.value:
         return parse_gdelt(fetch_bytes(gdelt_url(source.query or "")))
     return parse_rss(fetch_bytes(source.url or ""))
@@ -187,7 +238,7 @@ def ingest_source(db: Session, source: Source, settings: Settings, budget: int) 
     and never raises, so one dead feed cannot stop the others.
     """
     try:
-        entries = entries_for(source)
+        entries = entries_for(source, settings)
     except Exception as e:  # noqa: BLE001 - network, parsing, unsafe URL: all end up on the source
         source.last_error = f"{e.__class__.__name__}: {str(e)[:300]}"
         source.last_fetched_at = datetime.now(UTC)

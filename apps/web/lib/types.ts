@@ -1,12 +1,4 @@
-export type Role =
-  | "trend_analyst"
-  | "media_monitor"
-  | "ai_operator"
-  | "content_lead"
-  | "narrative_strategist"
-  | "diplomatic_editor"
-  | "president_office"
-  | "sysadmin";
+export type Role = "owner" | "assistant" | "sysadmin";
 export type Risk = "low" | "medium" | "high" | "critical";
 export type Stage = "draft" | "approved" | "published";
 
@@ -102,7 +94,7 @@ export interface IntelOverview {
 }
 export interface Source {
   id: string;
-  type: "rss" | "gdelt";
+  type: "rss" | "gdelt" | "x";
   name: string;
   url: string | null;
   query: string | null;
