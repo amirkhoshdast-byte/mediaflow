@@ -54,8 +54,13 @@ export function DraftCard({
     if (JSON.stringify(parts) !== JSON.stringify(draft.parts))
       call(() => api(`/drafts/${draft.id}`, { method: "PATCH", body: { parts } }));
   };
-  const move = (to: Stage, note?: string) =>
-    call(() => api(`/drafts/${draft.id}/transition`, { body: { to, note } }));
+  const move = (to: Stage, opts: { note?: string; confirmHighRisk?: boolean } = {}) =>
+    call(() =>
+      api(`/drafts/${draft.id}/transition`, {
+        body: { to, note: opts.note, confirm_high_risk: opts.confirmHighRisk ?? false },
+      }),
+    );
+  const highRisk = draft.risk === "high" || draft.risk === "critical";
 
   async function copy() {
     try {
@@ -68,12 +73,18 @@ export function DraftCard({
   }
 
   return (
-    <article className="card space-y-2 p-3" aria-label={draft.angle ?? "پیش‌نویس"}>
+    <article
+      className={`card space-y-2 p-3 ${highRisk && draft.stage !== "published" ? "border-s-4 border-s-danger" : ""}`}
+      aria-label={draft.angle ?? "پیش‌نویس"}
+    >
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="badge border-line text-muted">
           {FORMAT_FA[draft.format]} · {LANG_FA[draft.language]}
         </span>
         <RiskBadge risk={draft.risk} />
+        {highRisk && draft.stage !== "published" && (
+          <span className="badge border-danger font-bold text-danger">⚠ پرریسک</span>
+        )}
         {showStage && (
           <span className="badge border-accent text-accent">{STAGE_FA[draft.stage]}</span>
         )}
@@ -107,13 +118,13 @@ export function DraftCard({
         );
       })}
 
-      {draft.stage === "tone_review" && (
+      {(draft.stage === "draft" || draft.stage === "approved") && (
         <ToneReviewPanel
           draft={draft}
           canApply={editable}
           onApply={(suggested) =>
             window.confirm(
-              "پس از اعمال پیشنهاد، پیش‌نویس به مرحله ویرایش برمی‌گردد و باید دوباره برای بازبینی ارسال شود. ادامه می‌دهید؟",
+              "متن پیش‌نویس با نسخه‌ی پیشنهادی جایگزین می‌شود (و تأیید قبلی، اگر بود، باطل می‌شود). ادامه می‌دهید؟",
             ) &&
             call(() => api(`/drafts/${draft.id}`, { method: "PATCH", body: { parts: suggested } }))
           }
@@ -154,30 +165,26 @@ export function DraftCard({
           {copied ? "کپی شد" : "کپی"}
         </button>
 
-        {draft.stage === "draft" && can("draft:submit") && (
-          <button className="btn btn-primary" disabled={busy} onClick={() => move("tone_review")}>
-            ارسال به بازبینی
+        {draft.stage === "draft" && can(approveLevel) && (
+          <button
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={() => {
+              if (!highRisk) return move("approved");
+              if (
+                window.confirm(
+                  "این پیش‌نویس پرریسک است. بررسی لحن و خط‌های قرمز را دیده‌اید و تأیید انتشار می‌دهید؟",
+                )
+              )
+                move("approved", { confirmHighRisk: true });
+            }}
+          >
+            تأیید انتشار
           </button>
         )}
-        {draft.stage === "tone_review" && can(approveLevel) && (
-          <>
-            <button className="btn btn-primary" disabled={busy} onClick={() => move("approved")}>
-              تأیید
-            </button>
-            <button
-              className="btn btn-danger"
-              disabled={busy}
-              onClick={() => move("draft", window.prompt("دلیل بازگشت به پیش‌نویس:") ?? undefined)}
-            >
-              بازگشت
-            </button>
-          </>
-        )}
-        {draft.stage === "tone_review" && !can(approveLevel) && (
+        {draft.stage === "draft" && !can(approveLevel) && (
           <span className="text-xs text-muted">
-            {approveLevel === "approve:high_critical"
-              ? "در انتظار تأیید دفتر رئیس"
-              : "در انتظار ویراستار دیپلماتیک"}
+            {highRisk ? "تأیید پرریسک با نقش دارای دسترسی" : "در انتظار تأیید"}
           </span>
         )}
         {draft.stage === "approved" && can("draft:publish") && (
@@ -189,6 +196,17 @@ export function DraftCard({
             }
           >
             ثبت انتشار
+          </button>
+        )}
+        {draft.stage === "approved" && (can(approveLevel) || can("draft:edit")) && (
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={() =>
+              move("draft", { note: window.prompt("دلیل لغو تأیید (اختیاری):") ?? undefined })
+            }
+          >
+            لغو تأیید
           </button>
         )}
       </div>

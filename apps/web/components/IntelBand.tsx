@@ -108,7 +108,7 @@ export function IntelBand({
             </ul>
           </div>
           <div className="card p-3">
-            <h2 className="mb-1 text-sm font-bold">نیازمند توجه دفتر رئیس</h2>
+            <h2 className="mb-1 text-sm font-bold">نیازمند توجه (پرریسک و روایت و پاسخ)</h2>
             {attention.length === 0 ? (
               <p className="text-sm text-muted">مورد پرریسک یا نیازمند پاسخی نیست.</p>
             ) : (

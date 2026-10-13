@@ -23,7 +23,6 @@ export const RISK_CLASS: Record<string, string> = {
 };
 export const STAGE_FA: Record<string, string> = {
   draft: "پیش‌نویس",
-  tone_review: "بازبینی لحن",
   approved: "تأییدشده",
   published: "منتشرشده",
 };
@@ -81,6 +80,7 @@ export const ERROR_FA: Record<string, string> = {
   only_reviewers_may_lower_risk: "کاهش سطح ریسک فقط توسط بازبین مجاز است.",
   no_valid_approval: "تأیید معتبری برای این پیش‌نویس ثبت نشده است.",
   duplicate: "این خبر قبلاً ثبت شده است.",
+  high_risk_needs_confirmation: "برای تأیید پیش‌نویس پرریسک باید صراحتاً تأیید کنید.",
   forbidden: "دسترسی مجاز نیست.",
   red_line_exists: "این مورد قبلاً در فهرست خطوط قرمز هست.",
   rss_needs_http_url: "برای RSS آدرس http یا https لازم است.",

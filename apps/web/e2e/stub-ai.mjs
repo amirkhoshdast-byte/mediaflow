@@ -28,6 +28,20 @@ const review = {
   suggested_parts: null,
 };
 
+const reviewRedLine = {
+  score: 40,
+  issues: [
+    {
+      type: "red_line_topic",
+      quote: "عملیات نظامی",
+      reason: "موضوع خط قرمز: عملیات نظامی",
+      red_line: "عملیات نظامی",
+      suggestion: "",
+    },
+  ],
+  suggested_parts: null,
+};
+
 const longTweet = "متن آزمایشی بلند ".repeat(20).trim(); // > 280 chars on purpose
 const variants = {
   variants: [
@@ -53,7 +67,9 @@ createServer((req, res) => {
     const answer = user.includes("Items from the period")
       ? "خلاصه آزمایشی: امروز تحولات مهمی در منابع رصد نشد."
       : user.includes("Review this draft")
-        ? review
+        ? (user.split("<untrusted_input>")[1] ?? "").includes("عملیات نظامی")
+          ? reviewRedLine
+          : review
         : user.includes("Analyse this item")
           ? analysis
           : variants;

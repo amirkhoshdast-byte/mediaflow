@@ -8,7 +8,7 @@ export type Role =
   | "president_office"
   | "sysadmin";
 export type Risk = "low" | "medium" | "high" | "critical";
-export type Stage = "draft" | "tone_review" | "approved" | "published";
+export type Stage = "draft" | "approved" | "published";
 
 export interface Me {
   id: string;
@@ -150,8 +150,8 @@ export interface ReportContent {
   opportunities: ReportSignal[];
   pipeline: {
     stages: Record<string, number>;
-    waiting_president_office: number;
-    waiting_editor: number;
+    awaiting_approval: number;
+    high_risk_open: number;
   };
   targets: { posts: { done: number; target: number }; replies: { done: number; target: number } };
   sources: { active: number; failing: number };

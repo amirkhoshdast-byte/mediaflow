@@ -97,8 +97,8 @@ export function StudioColumn({
               </div>
               {silent && (
                 <p role="alert" className="mt-1 text-xs text-warn">
-                  رویکرد پیشنهادی این سیگنال «{APPROACH_FA[signal.approach!]}» است؛ تولید محتوا ممکن
-                  است مناسب نباشد.
+                  رویکرد پیشنهادی این سیگنال «{APPROACH_FA[signal.approach!]}» است. پیش‌نویس‌ها
+                  ساخته می‌شوند ولی پرریسک علامت می‌خورند و تأیید صریح شما را می‌خواهند.
                 </p>
               )}
             </div>

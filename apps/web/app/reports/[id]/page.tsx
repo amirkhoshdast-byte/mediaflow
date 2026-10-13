@@ -111,8 +111,8 @@ export default function ReportPage() {
           ))}
         </div>
         <p>
-          در انتظار دفتر رئیس: <strong>{fa(c.pipeline.waiting_president_office)}</strong> · در
-          انتظار ویراستار دیپلماتیک: <strong>{fa(c.pipeline.waiting_editor)}</strong>
+          در انتظار تأیید: <strong>{fa(c.pipeline.awaiting_approval)}</strong> · پرریسک باز:{" "}
+          <strong>{fa(c.pipeline.high_risk_open)}</strong>
         </p>
         <p className="text-muted">
           پست‌های امروز {fa(c.targets.posts.done)} از {fa(c.targets.posts.target)} · ریپلای‌ها{" "}

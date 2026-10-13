@@ -51,6 +51,7 @@ test.beforeAll(async ({ browser }) => {
     ["e2e-editor", "diplomatic_editor"],
     ["e2e-operator", "ai_operator"],
     ["e2e-analyst", "trend_analyst"],
+    ["e2e-boss", "president_office"],
     ["e2e-strategist", "narrative_strategist"],
   ]) {
     const r = await page.request.post("/api/admin/users", {
@@ -84,27 +85,20 @@ test("signal → draft → approval → published", async ({ browser }) => {
   await expect(studio.getByText("بیش از حد مجاز")).toHaveCount(1);
   await expect(studio.locator("textarea[aria-invalid=true]")).toHaveCount(1);
 
-  // --- lead submits; cannot approve their own draft ---
+  // --- the review runs by itself; the lead cannot approve her own draft ---
   const card = studio.getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" });
-  await card.getByRole("button", { name: "ارسال به بازبینی" }).click();
-  await expect(card.getByText("در انتظار ویراستار دیپلماتیک")).toBeVisible();
   const reviewPanel = card.getByRole("region", { name: "بررسی لحن" });
   await expect(reviewPanel.getByText("امتیاز ۸۸")).toBeVisible();
   await expect(reviewPanel.getByText("قلاب می‌تواند قوی‌تر باشد")).toBeVisible();
-  await expect(card.getByRole("button", { name: "تأیید" })).toHaveCount(0);
+  await expect(card.getByText("در انتظار تأیید")).toBeVisible();
+  await expect(card.getByRole("button", { name: "تأیید انتشار" })).toHaveCount(0);
 
-  // --- diplomatic editor approves ---
+  // --- the editor approves publication (low risk: no extra question) ---
   const editor = await userPage(browser, "e2e-editor", PASSWORD);
   const queue = editor.getByRole("region", { name: "صف انتشار" });
-  await queue
-    .getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" })
-    .getByRole("button", { name: "تأیید" })
-    .click();
-  await expect(
-    queue
-      .getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" })
-      .getByRole("button", { name: "تأیید" }),
-  ).toHaveCount(0);
+  const queued = queue.getByRole("article", { name: "ثبات و پیش‌بینی‌پذیری" });
+  await queued.getByRole("button", { name: "تأیید انتشار" }).click();
+  await expect(queued.getByRole("button", { name: "تأیید انتشار" })).toHaveCount(0);
 
   // --- lead records publication (after manual posting on X) ---
   lead.on("dialog", (d) => d.accept());
@@ -202,4 +196,52 @@ test("reports: an analyst builds one and the team is notified", async ({ browser
   await expect(
     lead.getByRole("button", { name: "علامت‌گذاری همه به‌عنوان خوانده‌شده" }),
   ).toHaveCount(0); // all read
+});
+
+test("high-risk drafts are labelled, get their own tab and need an explicit yes", async ({
+  browser,
+}) => {
+  const lead = await userPage(browser, "e2e-lead", PASSWORD);
+  const studio = lead.getByRole("region", { name: "استودیوی محتوا" });
+  await studio
+    .getByPlaceholder("موضوع را بنویسید یا از ستون رصد یک سیگنال انتخاب کنید")
+    .fill("وضعیت منطقه");
+  await studio.getByRole("button", { name: "تولید سه پیشنهاد" }).click();
+  await expect(studio.getByRole("article")).toHaveCount(3);
+
+  // The editor touches a red-line topic: the review finds it and the risk goes up by itself.
+  const text = studio.getByRole("article").first().locator("textarea");
+  await text.fill("گزارش‌هایی درباره عملیات نظامی جدید در منطقه منتشر شده است.");
+  await text.blur();
+  const risky = studio.getByRole("article").filter({ hasText: "⚠ پرریسک" });
+  await expect(risky).toHaveCount(1, { timeout: 30_000 });
+  await expect(
+    risky.getByRole("region", { name: "بررسی لحن" }).getByText("موضوع خط قرمز: عملیات نظامی"),
+  ).toBeVisible();
+
+  const pipeline = lead.getByRole("region", { name: "صف انتشار" });
+  await pipeline.getByRole("tab", { name: /پرریسک/ }).click();
+  await expect(pipeline.getByRole("article")).toHaveCount(1);
+  await expect(pipeline.getByRole("tab", { name: /پرریسک/ })).toContainText("۱");
+
+  // A normal approver cannot approve it; the President's Office must, and is asked to confirm.
+  const editor = await userPage(browser, "e2e-editor", PASSWORD);
+  await editor
+    .getByRole("region", { name: "صف انتشار" })
+    .getByRole("tab", { name: /پرریسک/ })
+    .click();
+  await expect(editor.getByText("تأیید پرریسک با نقش دارای دسترسی")).toBeVisible();
+
+  const boss = await userPage(browser, "e2e-boss", PASSWORD);
+  let asked = "";
+  boss.on("dialog", (d) => {
+    asked = d.message();
+    d.accept();
+  });
+  const bossQueue = boss.getByRole("region", { name: "صف انتشار" });
+  await bossQueue.getByRole("tab", { name: /پرریسک/ }).click();
+  const item = bossQueue.getByRole("article").first();
+  await item.getByRole("button", { name: "تأیید انتشار" }).click();
+  await expect(item.getByRole("button", { name: "لغو تأیید" })).toBeVisible(); // now approved
+  expect(asked).toContain("پرریسک");
 });

@@ -5,7 +5,6 @@ Revises: 0001
 """
 
 import sqlalchemy as sa
-from pgvector.sqlalchemy import Vector
 
 from alembic import op
 
@@ -38,17 +37,16 @@ def upgrade() -> None:
         sa.Column("doc_id", sa.String(length=32), nullable=False),
         sa.Column("position", sa.Integer(), nullable=False),
         sa.Column("text", sa.Text(), nullable=False),
-        sa.Column("embedding", Vector(1024), nullable=True),
         sa.ForeignKeyConstraint(["doc_id"], ["knowledge_docs.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_knowledge_chunks_doc_id", "knowledge_chunks", ["doc_id"])
-    op.create_index(
-        "ix_knowledge_chunks_embedding",
-        "knowledge_chunks",
-        ["embedding"],
-        postgresql_using="hnsw",
-        postgresql_ops={"embedding": "vector_cosine_ops"},
+    # Plain SQL so this migration does not depend on the pgvector Python package, which the
+    # application no longer ships (the table is dropped again by 0008).
+    op.execute("ALTER TABLE knowledge_chunks ADD COLUMN embedding vector(1024)")
+    op.execute(
+        "CREATE INDEX ix_knowledge_chunks_embedding ON knowledge_chunks "
+        "USING hnsw (embedding vector_cosine_ops)"
     )
 
 
