@@ -104,9 +104,10 @@ class AIGateway:
     ) -> AIResult:
         provider = self.resolve_provider(task, sensitivity)  # routing check precedes everything
         tpl = self.load_template(db, task)
-        user = tpl.user_template
-        for key, value in variables.items():
-            user = user.replace("{{" + key + "}}", value)
+        # One pass: a value that itself contains "{{name}}" must not be expanded again.
+        user = re.sub(
+            r"\{\{(\w+)\}\}", lambda m: variables.get(m.group(1), m.group(0)), tpl.user_template
+        )
         text = provider.complete(
             tpl.system_text, user, model=tpl.default_model, max_tokens=max_tokens
         )

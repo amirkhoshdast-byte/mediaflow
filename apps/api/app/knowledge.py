@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.gateway import AIGateway
+from app.config import Settings
 from app.enums import DocStatus, Sensitivity
 from app.models import KnowledgeChunk, KnowledgeDoc
 
@@ -107,3 +108,30 @@ def search(
             for chunk, doc, dist in rows
         ]
     return sorted(hits, key=lambda h: h["score"], reverse=True)[:limit]
+
+
+MAX_CONTEXT_CHARS = 3500
+
+
+def retrieve_positions(
+    db: Session, gateway: AIGateway, text: str, settings: Settings
+) -> list[dict]:
+    """Organisation positions relevant to `text` for a prompt that goes to the generation provider.
+
+    Sensitive documents are excluded unconditionally: this text may leave the organisation.
+    """
+    hits = search(db, gateway, text[:1000], settings.kb_context_chunks, include_sensitive=False)
+    return [h for h in hits if h["score"] >= settings.kb_min_score]
+
+
+def format_positions(hits: list[dict]) -> str:
+    if not hits:
+        return "none"
+    out, used = [], 0
+    for h in hits:
+        entry = f"[{h['title']}]\n{h['text']}"
+        if used + len(entry) > MAX_CONTEXT_CHARS:
+            break
+        out.append(entry)
+        used += len(entry)
+    return "\n\n".join(out) or "none"

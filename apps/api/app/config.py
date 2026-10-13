@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b-instruct"
     ollama_embed_model: str = "bge-m3"
 
+    # Knowledge base retrieval for content generation
+    kb_context_chunks: int = 4
+    kb_min_score: float = 0.3
+
     # Daily targets shown in the header band
     target_posts_per_day: int = 3
     target_replies_per_day: int = 5
