@@ -1,12 +1,10 @@
-import hashlib
-import re
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import audit
+from app.analysis import content_hash
 from app.db import get_db
 from app.deps import current_user, require
 from app.enums import SignalStatus, SourceType
@@ -41,10 +39,6 @@ def serialize_signal(s: Signal) -> dict:
         "url": s.raw_item.url,
         "created_at": s.created_at.isoformat(),
     }
-
-
-def content_hash(text: str) -> str:
-    return hashlib.sha256(re.sub(r"\s+", " ", text.strip().lower()).encode()).hexdigest()
 
 
 @router.get("")

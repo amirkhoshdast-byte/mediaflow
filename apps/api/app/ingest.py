@@ -1,0 +1,229 @@
+"""Automatic intake of public media (RSS and GDELT). Fetching is the only part that touches the
+network; everything that follows (dedupe, caps, analysis) is plain data handling.
+
+Only public news sources are read. Source URLs are configured by staff, so every request is
+checked against private address ranges (SSRF) before and after each redirect."""
+
+import html
+import ipaddress
+import json
+import re
+import socket
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
+from urllib.parse import quote, urlparse
+
+import httpx
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.analysis import content_hash
+from app.config import Settings
+from app.enums import SignalStatus, SourceType
+from app.models import RawItem, Signal, Source
+
+MAX_BYTES = 5 * 1024 * 1024
+MAX_REDIRECTS = 3
+USER_AGENT = "Mozilla/5.0 (compatible; NarrativeCommandRoom/1.0; public-media-monitor)"
+
+
+class UnsafeUrl(ValueError):
+    pass
+
+
+@dataclass
+class Entry:
+    title: str
+    summary: str
+    link: str | None
+    published: datetime | None
+
+
+def check_public_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise UnsafeUrl("only http(s) URLs are allowed")
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+    except socket.gaierror as e:
+        raise UnsafeUrl("host does not resolve") from e
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise UnsafeUrl("address is not public")
+
+
+def fetch_bytes(url: str, *, timeout: float = 20.0) -> bytes:
+    with httpx.Client(
+        timeout=timeout, follow_redirects=False, headers={"User-Agent": USER_AGENT}
+    ) as c:
+        for _ in range(MAX_REDIRECTS + 1):
+            check_public_url(url)
+            with c.stream("GET", url) as r:
+                if r.is_redirect:
+                    url = str(r.url.join(r.headers["location"]))
+                    continue
+                r.raise_for_status()
+                body = bytearray()
+                for chunk in r.iter_bytes():
+                    body += chunk
+                    if len(body) > MAX_BYTES:
+                        raise ValueError("response too large")
+                return bytes(body)
+    raise UnsafeUrl("too many redirects")
+
+
+def _clean(text: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", text or ""))).strip()
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _child_text(node: ET.Element, *names: str) -> str:
+    for child in node:
+        if _local(child.tag) in names and (child.text or "").strip():
+            return child.text.strip()
+    return ""
+
+
+def _parse_date(raw: str) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        d = parsedate_to_datetime(raw)  # RSS: RFC 822
+    except (TypeError, ValueError):
+        try:
+            d = datetime.fromisoformat(raw.replace("Z", "+00:00"))  # Atom: ISO 8601
+        except ValueError:
+            return None
+    return d if d.tzinfo else d.replace(tzinfo=UTC)
+
+
+def parse_rss(content: bytes) -> list[Entry]:
+    """RSS 2.0 `item` and Atom `entry` elements."""
+    root = ET.fromstring(content)
+    out = []
+    for node in root.iter():
+        if _local(node.tag) not in {"item", "entry"}:
+            continue
+        title = _clean(_child_text(node, "title"))
+        if not title:
+            continue
+        link = _child_text(node, "link") or next(
+            (c.get("href") for c in node if _local(c.tag) == "link" and c.get("href")), None
+        )
+        out.append(
+            Entry(
+                title,
+                _clean(_child_text(node, "description", "summary")),
+                link or None,
+                _parse_date(_child_text(node, "pubDate", "published", "updated")),
+            )
+        )
+    return out
+
+
+def gdelt_url(query: str, max_records: int = 50) -> str:
+    return (
+        "https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&sort=datedesc"
+        f"&timespan=1d&maxrecords={max_records}&query={quote(query)}"
+    )
+
+
+def parse_gdelt(content: bytes) -> list[Entry]:
+    try:
+        articles = json.loads(content).get("articles", [])
+    except ValueError:  # GDELT answers with plain text when a query is rejected
+        raise ValueError(content[:200].decode("utf-8", "replace")) from None
+    out = []
+    for a in articles:
+        title = _clean(a.get("title", ""))
+        if not title:
+            continue
+        try:
+            published = datetime.strptime(a["seendate"], "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+        except (KeyError, ValueError):
+            published = None
+        out.append(Entry(title, f"({a.get('domain', '')})", a.get("url"), published))
+    return out
+
+
+def entries_for(source: Source) -> list[Entry]:
+    if source.type == SourceType.GDELT.value:
+        return parse_gdelt(fetch_bytes(gdelt_url(source.query or "")))
+    return parse_rss(fetch_bytes(source.url or ""))
+
+
+def _signals_today(db: Session) -> int:
+    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(Signal)
+            .join(RawItem, RawItem.id == Signal.raw_item_id)
+            .where(RawItem.source_id.is_not(None), Signal.created_at >= start)
+        )
+        or 0
+    )
+
+
+def ingest_source(db: Session, source: Source, settings: Settings, budget: int) -> list[str]:
+    """Store new entries of one source as signals awaiting analysis; returns their ids.
+
+    `budget` is how many more new signals this run may create; a failing source records its error
+    and never raises, so one dead feed cannot stop the others.
+    """
+    try:
+        entries = entries_for(source)
+    except Exception as e:  # noqa: BLE001 - network, parsing, unsafe URL: all end up on the source
+        source.last_error = f"{e.__class__.__name__}: {str(e)[:300]}"
+        source.last_fetched_at = datetime.now(UTC)
+        db.commit()
+        return []
+
+    cutoff = datetime.now(UTC) - timedelta(hours=settings.ingest_max_age_hours)
+    created: list[str] = []
+    for entry in entries:
+        if len(created) >= budget:
+            break
+        if entry.published and entry.published < cutoff:
+            continue
+        text = entry.title if not entry.summary else f"{entry.title}\n{entry.summary}"
+        digest = content_hash(entry.title)  # same headline from two outlets is one signal
+        if db.scalar(select(RawItem.id).where(RawItem.content_hash == digest)):
+            continue
+        if entry.link and db.scalar(select(RawItem.id).where(RawItem.url == entry.link)):
+            continue
+        item = RawItem(
+            source_id=source.id,
+            text=text[:4000],
+            url=entry.link,
+            published_at=entry.published,
+            content_hash=digest,
+        )
+        db.add(item)
+        db.flush()
+        signal = Signal(raw_item_id=item.id, status=SignalStatus.ANALYZING.value)
+        db.add(signal)
+        db.flush()
+        created.append(signal.id)
+    source.last_error = None
+    source.last_fetched_at = datetime.now(UTC)
+    db.commit()
+    return created
+
+
+def ingest_all(db: Session, settings: Settings) -> list[str]:
+    budget = min(
+        settings.ingest_max_new_per_run, settings.ingest_max_new_per_day - _signals_today(db)
+    )
+    created: list[str] = []
+    for source in db.scalars(select(Source).where(Source.active.is_(True)).order_by(Source.name)):
+        if budget - len(created) <= 0:
+            break
+        created += ingest_source(db, source, settings, budget - len(created))
+    return created

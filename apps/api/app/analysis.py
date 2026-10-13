@@ -1,5 +1,8 @@
 """Pure post-processing of model output. Models propose; these rules enforce SPEC section 5."""
 
+import hashlib
+import re
+
 from app.catalog import (
     CATEGORIES,
     SENSITIVE_CATEGORIES,
@@ -11,6 +14,11 @@ from app.enums import RISK_ORDER, Approach, RiskLevel
 
 _APPROACHES = {a.value for a in Approach}
 _RISKS = {r.value for r in RiskLevel}
+
+
+def content_hash(text: str) -> str:
+    """Stable identity of a news item: case and whitespace do not make it a different item."""
+    return hashlib.sha256(re.sub(r"\s+", " ", text.strip().lower()).encode()).hexdigest()
 
 
 def _at_least(risk: str, floor: RiskLevel) -> str:

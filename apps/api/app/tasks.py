@@ -6,9 +6,11 @@ from app.ai import get_gateway
 from app.ai.gateway import extract_json
 from app.analysis import normalize_analysis
 from app.celery_app import celery
+from app.config import get_settings
 from app.db import SessionLocal
 from app.enums import DocStatus, Sensitivity, SignalStatus
-from app.models import EMBED_DIM, KnowledgeChunk, KnowledgeDoc, Signal
+from app.ingest import ingest_all, ingest_source
+from app.models import EMBED_DIM, KnowledgeChunk, KnowledgeDoc, Signal, Source
 
 log = logging.getLogger("ncr.tasks")
 
@@ -67,3 +69,25 @@ def embed_document(doc_id: str) -> None:
             doc.status = DocStatus.FAILED.value
             doc.error = f"{e.__class__.__name__}: {str(e)[:300]}"
         db.commit()
+
+
+@celery.task(name="ingest.run_all")
+def ingest_all_sources() -> int:
+    with SessionLocal() as db:
+        created = ingest_all(db, get_settings())
+    for signal_id in created:
+        analyze_signal.delay(signal_id)
+    return len(created)
+
+
+@celery.task(name="ingest.run_source")
+def ingest_one(source_id: str) -> int:
+    settings = get_settings()
+    with SessionLocal() as db:
+        source = db.get(Source, source_id)
+        if not source:
+            return 0
+        created = ingest_source(db, source, settings, settings.ingest_max_new_per_run)
+    for signal_id in created:
+        analyze_signal.delay(signal_id)
+    return len(created)

@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b-instruct"
     ollama_embed_model: str = "bge-m3"
 
+    # Automatic ingestion (RSS / GDELT). Caps bound model spend if a feed floods.
+    ingest_enabled: bool = True
+    ingest_interval_seconds: int = 900
+    ingest_max_age_hours: int = 24
+    ingest_max_new_per_run: int = 40
+    ingest_max_new_per_day: int = 300
+
     # Knowledge base retrieval for content generation
     kb_context_chunks: int = 4
     kb_min_score: float = 0.3

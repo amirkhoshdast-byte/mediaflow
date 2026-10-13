@@ -11,8 +11,9 @@ from app.db import SessionLocal
 from app.enums import Role
 from app.models import User
 from app.red_lines import seed_red_lines
-from app.routers import auth, drafts, knowledge, meta, red_lines, signals, users
+from app.routers import auth, drafts, knowledge, meta, red_lines, signals, sources, users
 from app.security import hash_password
+from app.sources import seed_sources
 
 log = logging.getLogger("ncr")
 
@@ -22,6 +23,7 @@ def bootstrap_admin() -> None:
     with SessionLocal() as db:
         seed_prompts(db)
         seed_red_lines(db)
+        seed_sources(db)
         if db.scalar(select(func.count()).select_from(User)):
             return
         if not s.bootstrap_admin_password:
@@ -64,6 +66,7 @@ app.include_router(drafts.router)
 app.include_router(meta.router)
 app.include_router(knowledge.router)
 app.include_router(red_lines.router)
+app.include_router(sources.router)
 
 
 @app.get("/health")

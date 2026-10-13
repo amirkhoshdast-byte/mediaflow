@@ -61,8 +61,13 @@ class Source(Base):
     url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     language: Mapped[str] = mapped_column(String(8), default="en")
     domain: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    query: Mapped[str | None] = mapped_column(String(500), nullable=True)  # GDELT sources
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _ts()
+
+    raw_items: Mapped[list["RawItem"]] = relationship(back_populates=None, lazy="select")
 
 
 class RawItem(Base):
