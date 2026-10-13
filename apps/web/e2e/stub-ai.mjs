@@ -66,12 +66,14 @@ createServer((req, res) => {
       return res.end(JSON.stringify({ data }));
     }
     const user = payload.messages?.at(-1)?.content ?? "";
-    const answer = user.includes("Review this draft")
-      ? review
-      : user.includes("Analyse this item")
-        ? analysis
-        : variants;
-    const content = JSON.stringify(answer);
+    const answer = user.includes("Items from the period")
+      ? "خلاصه آزمایشی: امروز تحولات مهمی در منابع رصد نشد."
+      : user.includes("Review this draft")
+        ? review
+        : user.includes("Analyse this item")
+          ? analysis
+          : variants;
+    const content = typeof answer === "string" ? answer : JSON.stringify(answer);
     res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content } }] }));
   });
 }).listen(9099, "0.0.0.0");

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { format } from "date-fns-jalali";
+import { NotificationBell } from "./NotificationBell";
 import { faIR } from "date-fns-jalali/locale";
 import { useEffect, useState } from "react";
 import { ROLE_FA } from "@/lib/labels";
@@ -120,6 +121,9 @@ export function HeaderBand({
           <span className="text-sm">
             {me.display_name} <span className="text-muted">· {ROLE_FA[me.role]}</span>
           </span>
+          <Link href="/reports" className="btn">
+            گزارش‌ها
+          </Link>
           <Link href="/sources" className="btn">
             منابع
           </Link>
@@ -134,6 +138,7 @@ export function HeaderBand({
               مدیریت
             </Link>
           )}
+          <NotificationBell />
           <button className="btn" onClick={toggleTheme} aria-pressed={dark}>
             {dark ? "روشن" : "تیره"}
           </button>

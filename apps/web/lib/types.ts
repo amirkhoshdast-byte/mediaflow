@@ -150,3 +150,52 @@ export interface ToneReview {
   error: string | null;
   stale: boolean;
 }
+
+export interface ReportSignal {
+  id: string;
+  title: string;
+  summary: string | null;
+  zone: Signal["zone"];
+  risk: Risk | null;
+  category: string | null;
+  region: string | null;
+  relevance: number;
+  opportunity: string | null;
+}
+export interface ReportContent {
+  counts: { signals: number; by_zone: Record<string, number>; by_category: Record<string, number> };
+  top: ReportSignal[];
+  risks: ReportSignal[];
+  rebuttals: ReportSignal[];
+  opportunities: ReportSignal[];
+  pipeline: {
+    stages: Record<string, number>;
+    waiting_president_office: number;
+    waiting_editor: number;
+  };
+  targets: { posts: { done: number; target: number }; replies: { done: number; target: number } };
+  sources: { active: number; failing: number };
+}
+export interface ReportSummary {
+  id: string;
+  slot: "morning" | "afternoon" | "manual";
+  report_date: string;
+  period_start: string;
+  period_end: string;
+  created_at: string;
+  signals: number;
+}
+export interface Report extends ReportSummary {
+  content: ReportContent;
+  brief: string | null;
+  brief_error: string | null;
+}
+export interface NotificationItem {
+  id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}

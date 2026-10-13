@@ -215,3 +215,25 @@ test("sources: analysts manage them, other roles only see health", async ({ brow
   await expect(lead.getByText("منبع آزمایشی")).toBeVisible();
   await expect(lead.getByRole("button", { name: "افزودن منبع" })).toHaveCount(0);
 });
+
+test("reports: an analyst builds one and the team is notified", async ({ browser }) => {
+  const analyst = await userPage(browser, "e2e-analyst", PASSWORD);
+  await analyst.getByRole("link", { name: "گزارش‌ها" }).click();
+  await analyst.getByRole("button", { name: /ساخت گزارش همین حالا/ }).click();
+  await expect(analyst.getByRole("heading", { name: "گزارش دستی", level: 1 })).toBeVisible();
+  await expect(
+    analyst.getByRole("region", { name: "خلاصه" }).getByText("خلاصه آزمایشی"),
+  ).toBeVisible();
+  await expect(analyst.getByRole("region", { name: "مهم‌ترین‌ها" })).toBeVisible();
+
+  const lead = await userPage(browser, "e2e-lead", PASSWORD);
+  await lead.getByRole("button", { name: /اعلان‌ها/ }).click();
+  await lead.getByRole("menuitem", { name: /گزارش هوش/ }).click();
+  await expect(lead.getByRole("heading", { name: "گزارش دستی", level: 1 })).toBeVisible();
+  await lead.goto("/");
+  await lead.getByRole("button", { name: /اعلان‌ها/ }).click();
+  await expect(lead.getByRole("menuitem", { name: /گزارش هوش/ })).toBeVisible();
+  await expect(
+    lead.getByRole("button", { name: "علامت‌گذاری همه به‌عنوان خوانده‌شده" }),
+  ).toHaveCount(0); // all read
+});

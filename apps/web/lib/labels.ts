@@ -142,3 +142,9 @@ export const ISSUE_TYPE_FA: Record<string, string> = {
   fact: "واقعیت و منبع",
   other: "نکته",
 };
+
+export const SLOT_FA: Record<string, string> = {
+  morning: "گزارش هوش صبح (۸:۰۰)",
+  afternoon: "گزارش هوش عصر (۱۶:۰۰)",
+  manual: "گزارش دستی",
+};
