@@ -89,7 +89,7 @@ def test_opportunities_need_relevance_and_a_calm_zone(login):
     assert [o["opportunity"] for o in c["opportunities"]] == ["فرصت یک"]
 
 
-def test_pipeline_shows_who_each_waiting_draft_is_waiting_for(login):
+def test_pipeline_counts_open_drafts_and_flags_the_high_risk_ones(login):
     with SessionLocal() as db:
         for risk in ("low", "medium", "high", "critical"):
             db.add(
@@ -99,13 +99,13 @@ def test_pipeline_shows_who_each_waiting_draft_is_waiting_for(login):
                     persona="x",
                     pillar="y",
                     parts=["t"],
-                    stage="tone_review",
+                    stage="draft",
                     risk=risk,
                 )
             )
         db.commit()
         c = build_content(db, NOW - timedelta(hours=8), NOW, CFG)
-    assert c["pipeline"]["waiting_editor"] == 2 and c["pipeline"]["waiting_president_office"] == 2
+    assert c["pipeline"]["awaiting_approval"] == 4 and c["pipeline"]["high_risk_open"] == 2
 
 
 # ---------- generation ----------

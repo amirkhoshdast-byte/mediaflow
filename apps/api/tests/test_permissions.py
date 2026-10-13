@@ -24,9 +24,5 @@ def test_sysadmin_never_approves_content():
     assert not has_perm(Role.SYSADMIN, Perm.DRAFT_EDIT)
 
 
-def test_only_content_lead_submits_for_review():
-    assert [r for r in Role if has_perm(r, Perm.DRAFT_SUBMIT)] == [Role.CONTENT_LEAD]
-
-
 def test_unknown_role_has_nothing():
     assert not has_perm("nonsense", Perm.SIGNAL_ADD)

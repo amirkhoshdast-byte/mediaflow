@@ -1,5 +1,3 @@
-import logging
-import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,19 +6,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import audit
-from app.ai import SensitiveRoutingError, get_gateway
-from app.ai.gateway import extract_json
-from app.analysis import check_parts, clean_variants
+from app.ai import SensitiveRoutingError
+from app.analysis import check_parts
 from app.catalog import LANGUAGES, PERSONAS, PILLARS
 from app.db import get_db
 from app.deps import current_user, require
 from app.enums import RISK_ORDER, Decision, DraftFormat, RiskLevel, Stage
-from app.models import Approval, Draft, DraftVersion, RedLine, Signal, ToneReview, User
+from app.models import Approval, Draft, DraftVersion, Signal, ToneReview, User
 from app.permissions import Perm, can_approve, has_perm
-from app.tasks import review_draft
-from app.tone import parts_hash, rule_issues
+from app.studio import GenerationFailed, generate_drafts, start_review
+from app.tone import parts_hash
 
-log = logging.getLogger("ncr.drafts")
 router = APIRouter(tags=["drafts"])
 
 
@@ -67,59 +63,27 @@ def generate(
     if body.language not in LANGUAGES or body.persona not in PERSONAS or body.pillar not in PILLARS:
         raise HTTPException(422, "invalid_option")
 
-    risk = RiskLevel.MEDIUM.value
+    signal = None
     if body.signal_id:
         signal = db.get(Signal, body.signal_id)
         if not signal:
             raise HTTPException(404, "signal_not_found")
-        source = f"{signal.title}\n{signal.summary}\n\n{signal.raw_item.text[:4000]}"
-        risk = signal.risk or risk
-    else:
-        source = body.topic.strip()
-
     try:
-        result = get_gateway().run(
+        drafts = generate_drafts(
             db,
-            "content_generation",
-            {
-                "format": body.format.value,
-                "language": body.language,
-                "persona": body.persona,
-                "pillar": body.pillar,
-                "instructions": body.instructions or "none",
-                "source": source,
-            },
-            max_tokens=2500,
-        )
-        variants = clean_variants(extract_json(result.text), body.format.value)
-    except SensitiveRoutingError as e:
-        raise HTTPException(500, str(e)) from e
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"generation_failed: {e.__class__.__name__}") from e
-
-    group = uuid.uuid4().hex
-    drafts = []
-    for v in variants:
-        d = Draft(
-            signal_id=body.signal_id,
-            topic=None if body.signal_id else source,
-            format=body.format.value,
+            signal=signal,
+            topic=body.topic,
+            fmt=body.format.value,
             language=body.language,
             persona=body.persona,
             pillar=body.pillar,
-            angle=v["angle"],
-            generation_group=group,
-            parts=v["parts"],
-            stage=Stage.DRAFT.value,
-            risk=risk,
-            created_by=user.id,
+            instructions=body.instructions,
+            user_id=user.id,
         )
-        db.add(d)
-        db.flush()
-        db.add(DraftVersion(draft_id=d.id, parts=d.parts, author_type="ai", author_id=None))
-        drafts.append(d)
-    audit.log(db, user.id, "draft.generated", "draft", group, {"count": len(drafts)})
-    db.commit()
+    except SensitiveRoutingError as e:
+        raise HTTPException(500, str(e)) from e
+    except GenerationFailed as e:
+        raise HTTPException(502, f"generation_failed: {e}") from e
     return [serialize_draft(d) for d in drafts]
 
 
@@ -162,6 +126,7 @@ def patch_draft(
     d = _get(db, draft_id)
     if d.stage == Stage.PUBLISHED.value:
         raise HTTPException(409, "published_is_immutable")
+    edited = False
     if body.risk and body.risk.value != d.risk:
         lowering = RISK_ORDER[body.risk] < RISK_ORDER[RiskLevel(d.risk)]
         if lowering and not has_perm(user.role, Perm.DRAFT_LOWER_RISK):
@@ -183,17 +148,24 @@ def patch_draft(
         if parts != d.parts:
             d.parts = parts
             db.add(DraftVersion(draft_id=d.id, parts=parts, author_type="human", author_id=user.id))
-            # Any edit voids earlier review/approval: the text that was approved no longer exists.
-            if d.stage in (Stage.TONE_REVIEW.value, Stage.APPROVED.value):
+            # Any edit voids an earlier approval: the text that was approved no longer exists.
+            if d.stage == Stage.APPROVED.value:
                 d.stage = Stage.DRAFT.value
             audit.log(db, user.id, "draft.edited", "draft", d.id)
+            edited = True
     db.commit()
+    if edited:
+        start_review(db, d)
     return serialize_draft(d)
 
 
 class TransitionIn(BaseModel):
     to: Stage
     note: str | None = Field(default=None, max_length=1000)
+    confirm_high_risk: bool = False  # the explicit "yes, I know" for high and critical drafts
+
+
+HIGH = {RiskLevel.HIGH.value, RiskLevel.CRITICAL.value}
 
 
 @router.post("/drafts/{draft_id}/transition")
@@ -206,29 +178,39 @@ def transition(
     d = _get(db, draft_id)
     src, dst = Stage(d.stage), body.to
 
-    if (src, dst) == (Stage.DRAFT, Stage.TONE_REVIEW):
-        if not has_perm(user.role, Perm.DRAFT_SUBMIT):
-            raise HTTPException(403, "forbidden")
-        audit.log(db, user.id, "draft.submitted", "draft", d.id)
-
-    elif (src, dst) in ((Stage.TONE_REVIEW, Stage.APPROVED), (Stage.TONE_REVIEW, Stage.DRAFT)):
-        # Approving or sending back is a review decision, recorded and gated by risk level.
+    if (src, dst) == (Stage.DRAFT, Stage.APPROVED):
         if not can_approve(user.role, d.risk):
             raise HTTPException(403, "approval_level_insufficient")
-        approved = dst == Stage.APPROVED
+        if d.risk in HIGH and not body.confirm_high_risk:
+            raise HTTPException(409, "high_risk_needs_confirmation")
         db.add(
             Approval(
                 draft_id=d.id,
                 approver_id=user.id,
-                decision=(Decision.APPROVED if approved else Decision.REJECTED).value,
+                decision=Decision.APPROVED.value,
                 note=body.note,
                 risk_at_decision=d.risk,
             )
         )
         audit.log(
-            db, user.id, "draft.approved" if approved else "draft.rejected", "draft", d.id,
-            {"risk": d.risk},
+            db, user.id, "draft.approved", "draft", d.id,
+            {"risk": d.risk, "confirmed_high_risk": body.confirm_high_risk},
         )  # fmt: skip
+
+    elif (src, dst) == (Stage.APPROVED, Stage.DRAFT):
+        # Withdrawing an approval is recorded like any other decision.
+        if not (can_approve(user.role, d.risk) or has_perm(user.role, Perm.DRAFT_EDIT)):
+            raise HTTPException(403, "forbidden")
+        db.add(
+            Approval(
+                draft_id=d.id,
+                approver_id=user.id,
+                decision=Decision.REJECTED.value,
+                note=body.note,
+                risk_at_decision=d.risk,
+            )
+        )
+        audit.log(db, user.id, "draft.approval_withdrawn", "draft", d.id, {"risk": d.risk})
 
     elif (src, dst) == (Stage.APPROVED, Stage.PUBLISHED):
         if not has_perm(user.role, Perm.DRAFT_PUBLISH):
@@ -250,8 +232,6 @@ def transition(
 
     d.stage = dst.value
     db.commit()
-    if (src, dst) == (Stage.DRAFT, Stage.TONE_REVIEW):
-        _start_review(db, d)
     return serialize_draft(d)
 
 
@@ -287,22 +267,6 @@ def history(draft_id: str, _: User = Depends(current_user), db: Session = Depend
 # ---------- Tone review ----------
 
 
-def _start_review(db: Session, d: Draft) -> ToneReview:
-    """Rule findings are stored now; the model's judgement follows from a worker task."""
-    red_lines = list(db.scalars(select(RedLine).where(RedLine.active.is_(True))))
-    review = ToneReview(
-        draft_id=d.id,
-        parts_hash=parts_hash(d.parts),
-        parts_snapshot=list(d.parts),
-        issues=rule_issues(d.parts, d.language, red_lines),
-    )
-    db.add(review)
-    db.commit()
-    review_draft.delay(review.id)
-    db.refresh(review)
-    return review
-
-
 def serialize_review(r: ToneReview, d: Draft) -> dict:
     return {
         "id": r.id,
@@ -334,7 +298,7 @@ def rerun_review(
     draft_id: str, user: User = Depends(require(Perm.DRAFT_EDIT)), db: Session = Depends(get_db)
 ) -> dict:
     d = _get(db, draft_id)
-    if d.stage not in (Stage.DRAFT.value, Stage.TONE_REVIEW.value):
-        raise HTTPException(409, "review_only_before_approval")
+    if d.stage == Stage.PUBLISHED.value:
+        raise HTTPException(409, "published_is_immutable")
     audit.log(db, user.id, "draft.review_requested", "draft", d.id)
-    return serialize_review(_start_review(db, d), d)
+    return serialize_review(start_review(db, d), d)

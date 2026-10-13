@@ -24,7 +24,6 @@ RISK_ORDER = {RiskLevel.LOW: 0, RiskLevel.MEDIUM: 1, RiskLevel.HIGH: 2, RiskLeve
 
 class Stage(StrEnum):
     DRAFT = "draft"
-    TONE_REVIEW = "tone_review"
     APPROVED = "approved"
     PUBLISHED = "published"
 

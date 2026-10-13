@@ -79,8 +79,10 @@ def build_content(db: Session, start: datetime, end: datetime, settings: Setting
         ).all()
     )
     replies = published.get(DraftFormat.REPLY.value, 0)
-    in_review = list(db.scalars(select(Draft).where(Draft.stage == Stage.TONE_REVIEW.value)))
     high = {RiskLevel.HIGH.value, RiskLevel.CRITICAL.value}
+    open_drafts = list(
+        db.scalars(select(Draft).where(Draft.stage.in_([Stage.DRAFT.value, Stage.APPROVED.value])))
+    )
     sources = list(db.scalars(select(Source).where(Source.active.is_(True))))
 
     return {
@@ -101,8 +103,8 @@ def build_content(db: Session, start: datetime, end: datetime, settings: Setting
             "stages": dict(
                 db.execute(select(Draft.stage, func.count()).group_by(Draft.stage)).all()
             ),
-            "waiting_president_office": sum(d.risk in high for d in in_review),
-            "waiting_editor": sum(d.risk not in high for d in in_review),
+            "awaiting_approval": sum(d.stage == Stage.DRAFT.value for d in open_drafts),
+            "high_risk_open": sum(d.risk in high for d in open_drafts),
         },
         "targets": {
             "posts": {

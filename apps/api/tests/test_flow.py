@@ -83,7 +83,6 @@ def _as(client, login, role, name):
 def test_low_risk_full_chain(client, login):
     lead = login(Role.CONTENT_LEAD)
     d = _draft(lead, "low")
-    assert lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"}).status_code == 200
     # Content lead cannot approve her own draft
     assert lead.post(f"/drafts/{d['id']}/transition", json={"to": "approved"}).status_code == 403
     login(Role.DIPLOMATIC_EDITOR)
@@ -96,13 +95,25 @@ def test_low_risk_full_chain(client, login):
     assert h["approvals"][0]["decision"] == "approved" and len(h["versions"]) == 1
 
 
-def test_high_risk_needs_president_office(client, login):
+def test_high_risk_needs_president_office_and_an_explicit_yes(client, login):
     lead = login(Role.CONTENT_LEAD)
     d = _draft(lead, "high")
-    lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"})
     login(Role.DIPLOMATIC_EDITOR)
     assert client.post(f"/drafts/{d['id']}/transition", json={"to": "approved"}).status_code == 403
     login(Role.PRESIDENT_OFFICE)
+    ask = client.post(f"/drafts/{d['id']}/transition", json={"to": "approved"})
+    assert ask.status_code == 409 and ask.json()["detail"] == "high_risk_needs_confirmation"
+    yes = client.post(
+        f"/drafts/{d['id']}/transition", json={"to": "approved", "confirm_high_risk": True}
+    )
+    assert yes.status_code == 200 and yes.json()["stage"] == "approved"
+
+
+def test_low_risk_needs_no_confirmation_and_cannot_use_the_removed_review_stage(client, login):
+    lead = login(Role.CONTENT_LEAD)
+    d = _draft(lead, "low")
+    assert lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"}).status_code == 422
+    login(Role.DIPLOMATIC_EDITOR)
     assert client.post(f"/drafts/{d['id']}/transition", json={"to": "approved"}).status_code == 200
 
 
@@ -110,14 +121,12 @@ def test_cannot_skip_to_published(login):
     lead = login(Role.CONTENT_LEAD)
     d = _draft(lead, "low")
     assert lead.post(f"/drafts/{d['id']}/transition", json={"to": "published"}).status_code == 409
-    lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"})
     assert lead.post(f"/drafts/{d['id']}/transition", json={"to": "published"}).status_code == 409
 
 
 def test_edit_after_approval_voids_it(client, login):
     lead = login(Role.CONTENT_LEAD)
     d = _draft(lead, "low")
-    lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"})
     login(Role.DIPLOMATIC_EDITOR)
     client.post(f"/drafts/{d['id']}/transition", json={"to": "approved"})
     login(Role.CONTENT_LEAD)
@@ -135,20 +144,23 @@ def test_risk_can_be_raised_but_only_reviewers_lower_it(client, login):
     assert client.patch(f"/drafts/{d['id']}", json={"risk": "low"}).status_code == 200
 
 
-def test_rejection_returns_to_draft_and_is_recorded(client, login):
+def test_withdrawing_an_approval_returns_to_draft_and_is_recorded(client, login):
     lead = login(Role.CONTENT_LEAD)
     d = _draft(lead, "low")
-    lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"})
     login(Role.DIPLOMATIC_EDITOR)
+    client.post(f"/drafts/{d['id']}/transition", json={"to": "approved"})
     r = client.post(f"/drafts/{d['id']}/transition", json={"to": "draft", "note": "لحن تند"})
     assert r.json()["stage"] == "draft"
-    assert client.get(f"/drafts/{d['id']}/history").json()["approvals"][0]["decision"] == "rejected"
+    decisions = [
+        a["decision"] for a in client.get(f"/drafts/{d['id']}/history").json()["approvals"]
+    ]
+    assert decisions == ["approved", "rejected"]
+    assert client.post(f"/drafts/{d['id']}/transition", json={"to": "published"}).status_code == 409
 
 
 def test_stats_count_published_today(client, login):
     lead = login(Role.CONTENT_LEAD)
     d = _draft(lead, "low")
-    lead.post(f"/drafts/{d['id']}/transition", json={"to": "tone_review"})
     login(Role.DIPLOMATIC_EDITOR)
     client.post(f"/drafts/{d['id']}/transition", json={"to": "approved"})
     login(Role.CONTENT_LEAD)

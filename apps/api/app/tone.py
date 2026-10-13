@@ -9,9 +9,10 @@ import hashlib
 import json
 import re
 
+from app import audit
 from app.analysis import check_parts
-from app.enums import RedLineKind
-from app.models import RedLine
+from app.enums import RISK_ORDER, RedLineKind, RiskLevel, Stage
+from app.models import Draft, RedLine
 
 # Bureaucratic wording the voice guide bans outright (Persian drafts only).
 OFFICE_WORDS = [
@@ -113,3 +114,29 @@ def clean_model_review(data: dict, red_lines: list[RedLine], n_parts: int) -> di
     else:
         suggested = None
     return {"issues": issues, "score": score, "suggested_parts": suggested}
+
+
+def escalation_floor(issues: list[dict]) -> RiskLevel | None:
+    """The highest severity any finding carries; only red-line findings carry one."""
+    levels = [RiskLevel(i["severity"]) for i in issues if i.get("severity")]
+    return max(levels, key=RISK_ORDER.__getitem__, default=None)
+
+
+def escalate_for_issues(db, draft: Draft, issues: list[dict]) -> bool:
+    """Raise the draft's risk to the strongest finding. Risk never goes down here, and an approval
+    given at a lower level is voided (the draft returns to editing) because it no longer matches."""
+    floor = escalation_floor(issues)
+    if floor is None or RISK_ORDER[floor] <= RISK_ORDER[RiskLevel(draft.risk)]:
+        return False
+    reasons = [i.get("quote") or i["reason"] for i in issues if i.get("severity") == floor.value]
+    audit.log(
+        db, None, "draft.risk_escalated", "draft", draft.id,
+        {"from": draft.risk, "to": floor.value, "because": reasons[:5]},
+    )  # fmt: skip
+    draft.risk = floor.value
+    if draft.stage == Stage.APPROVED.value:
+        draft.stage = Stage.DRAFT.value
+        audit.log(
+            db, None, "draft.approval_voided", "draft", draft.id, {"reason": "risk_escalated"}
+        )
+    return True

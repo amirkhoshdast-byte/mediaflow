@@ -18,7 +18,13 @@ from app.models import (
     ToneReview,
 )
 from app.reports import due_slots, generate_report
-from app.tone import clean_model_review, draft_for_prompt, topics_for_prompt
+from app.tone import (
+    clean_model_review,
+    draft_for_prompt,
+    escalate_for_issues,
+    parts_hash,
+    topics_for_prompt,
+)
 
 log = logging.getLogger("ncr.tasks")
 
@@ -89,6 +95,10 @@ def review_draft(review_id: str) -> None:
                 extract_json(result.text), red_lines, len(review.parts_snapshot)
             )
             review.issues = [*review.issues, *parsed["issues"]]
+            if review.parts_hash == parts_hash(
+                draft.parts
+            ):  # a stale review must not move the risk
+                escalate_for_issues(db, draft, parsed["issues"])
             review.score, review.suggested_parts = parsed["score"], parsed["suggested_parts"]
             review.provider, review.status, review.error = result.provider, "ready", None
         except Exception as e:  # noqa: BLE001 - rule findings stay available even if the model fails

@@ -22,7 +22,7 @@ def test_totp_login_sets_session(client, make_user):
     assert r.status_code == 200
     me = client.get("/auth/me").json()
     assert me["role"] == "content_lead"
-    assert "draft:submit" in me["permissions"]
+    assert "draft:edit" in me["permissions"] and "draft:submit" not in me["permissions"]
 
 
 def test_wrong_totp_rejected(client, make_user):

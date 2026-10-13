@@ -9,7 +9,6 @@ class Perm(StrEnum):
     SOURCES_MANAGE = "sources:manage"
     SIGNAL_ADD = "signal:add"
     DRAFT_EDIT = "draft:edit"
-    DRAFT_SUBMIT = "draft:submit"
     DRAFT_PUBLISH = "draft:publish"
     DRAFT_LOWER_RISK = "draft:lower_risk"
     APPROVE_LOW_MEDIUM = "approve:low_medium"
@@ -26,7 +25,7 @@ PERMISSIONS: dict[Role, set[Perm]] = {
     R.TREND_ANALYST: {Perm.SOURCES_MANAGE, Perm.SIGNAL_ADD, Perm.REPORT_RUN},
     R.MEDIA_MONITOR: {Perm.SIGNAL_ADD},
     R.AI_OPERATOR: {Perm.PROMPTS_MANAGE},
-    R.CONTENT_LEAD: {Perm.SIGNAL_ADD, Perm.DRAFT_EDIT, Perm.DRAFT_SUBMIT, Perm.DRAFT_PUBLISH},
+    R.CONTENT_LEAD: {Perm.SIGNAL_ADD, Perm.DRAFT_EDIT, Perm.DRAFT_PUBLISH},
     R.NARRATIVE_STRATEGIST: {
         Perm.SIGNAL_ADD,
         Perm.DRAFT_EDIT,
