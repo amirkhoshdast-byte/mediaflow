@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     ingest_max_age_hours: int = 24
     ingest_max_new_per_run: int = 40
     ingest_max_new_per_day: int = 300
+    ingest_undated_per_run: int = 5  # feeds without dates would otherwise replay their archive
+    gdelt_min_interval_seconds: float = 6.0  # GDELT answers 429 to faster callers
 
     # Knowledge base retrieval for content generation
     kb_context_chunks: int = 4

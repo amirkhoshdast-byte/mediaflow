@@ -9,6 +9,7 @@ import ipaddress
 import json
 import re
 import socket
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -27,6 +28,7 @@ from app.models import RawItem, Signal, Source
 MAX_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 3
 USER_AGENT = "Mozilla/5.0 (compatible; NarrativeCommandRoom/1.0; public-media-monitor)"
+ACCEPT = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5"
 
 
 class UnsafeUrl(ValueError):
@@ -187,11 +189,16 @@ def ingest_source(db: Session, source: Source, settings: Settings, budget: int) 
 
     cutoff = datetime.now(UTC) - timedelta(hours=settings.ingest_max_age_hours)
     created: list[str] = []
+    undated = 0
     for entry in entries:
         if len(created) >= budget:
             break
         if entry.published and entry.published < cutoff:
             continue
+        if not entry.published:
+            undated += 1
+            if undated > settings.ingest_undated_per_run:
+                continue
         text = entry.title if not entry.summary else f"{entry.title}\n{entry.summary}"
         digest = content_hash(entry.title)  # same headline from two outlets is one signal
         if db.scalar(select(RawItem.id).where(RawItem.content_hash == digest)):
@@ -218,12 +225,22 @@ def ingest_source(db: Session, source: Source, settings: Settings, budget: int) 
 
 
 def ingest_all(db: Session, settings: Settings) -> list[str]:
-    budget = min(
-        settings.ingest_max_new_per_run, settings.ingest_max_new_per_day - _signals_today(db)
-    )
+    """One pass over every active source. The run budget is shared fairly so that sources sorted
+    late in the alphabet are not starved by the early ones."""
+    budget = min(settings.ingest_max_new_per_run, settings.ingest_max_new_per_day - _signals_today(db))
+    sources = list(db.scalars(select(Source).where(Source.active.is_(True)).order_by(Source.name)))
+    if budget <= 0 or not sources:
+        return []
+    share = max(2, budget // len(sources))
     created: list[str] = []
-    for source in db.scalars(select(Source).where(Source.active.is_(True)).order_by(Source.name)):
+    last_gdelt = 0.0
+    for source in sources:
         if budget - len(created) <= 0:
             break
-        created += ingest_source(db, source, settings, budget - len(created))
+        if source.type == SourceType.GDELT.value:
+            wait = settings.gdelt_min_interval_seconds - (time.monotonic() - last_gdelt)
+            if last_gdelt and wait > 0:
+                time.sleep(wait)
+            last_gdelt = time.monotonic()
+        created += ingest_source(db, source, settings, min(share, budget - len(created)))
     return created

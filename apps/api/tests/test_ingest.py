@@ -234,3 +234,37 @@ def test_atom_feeds_are_parsed_too():
     (e,) = ingest.parse_rss(atom)
     assert e.title == "Atom item" and e.link == "https://a.example/atom/1"
     assert e.published == datetime(2026, 10, 13, 10, 15, tzinfo=UTC)
+
+
+def test_feeds_without_dates_cannot_replay_their_archive(feeds):
+    body = "".join(f"<item><title>archive {i}</title><link>https://a.example/{i}</link></item>" for i in range(30))
+    feeds["https://a.example/rss"] = f"<rss><channel>{body}</channel></rss>".encode()
+    with SessionLocal() as db:
+        assert len(ingest.ingest_source(db, _source(db), _settings(ingest_undated_per_run=5), 40)) == 5
+
+
+def test_budget_is_shared_so_late_sources_are_not_starved(feeds):
+    for name in ("A", "B", "C", "D"):
+        feeds[f"https://{name.lower()}.example/rss"] = _rss(
+            *[(f"{name} خبر {i}", f"https://{name.lower()}.example/{i}", NOW) for i in range(10)]
+        )
+    with SessionLocal() as db:
+        db.query(Source).delete()
+        for name in ("A", "B", "C", "D"):
+            _source(db, name, f"https://{name.lower()}.example/rss")
+        ids = ingest.ingest_all(db, _settings(ingest_max_new_per_run=8, gdelt_min_interval_seconds=0))
+        by_source = {db.get(Signal, i).raw_item.text[0] for i in ids}
+    assert len(ids) == 8 and by_source == {"A", "B", "C", "D"}
+
+
+def test_gdelt_calls_are_spaced(feeds, monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(ingest.time, "sleep", lambda s: sleeps.append(s))
+    with SessionLocal() as db:
+        db.query(Source).delete()
+        for i in range(3):
+            db.add(Source(type="gdelt", name=f"G{i}", query="Iran"))
+        db.commit()
+        feeds[ingest.gdelt_url("Iran")] = b'{"articles": []}'
+        ingest.ingest_all(db, _settings(gdelt_min_interval_seconds=6))
+    assert len(sleeps) == 2 and all(0 < s <= 6 for s in sleeps)

@@ -1,5 +1,5 @@
-"""Starting list of public media sources. Reuters and AP publish no public RSS feeds, so they are
-read through GDELT, which indexes their articles. Adjust the list from the Sources page."""
+"""Starting list of public media sources. Reuters and AP publish no public RSS feeds, and UN News
+refuses non-browser clients, so they are read through GDELT, which indexes their articles. Adjust the list from the Sources page."""
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -16,13 +16,13 @@ STARTER: list[tuple[str, str, str, str, str]] = [
     ("rss", "Foreign Policy", "https://foreignpolicy.com/feed/", "en", "politics"),
     ("rss", "DW", "https://rss.dw.com/xml/rss-en-all", "en", "international"),
     ("rss", "France 24", "https://www.france24.com/en/rss", "en", "international"),
-    ("rss", "UN News", "https://news.un.org/feed/subscribe/en/news/all/rss.xml", "en", "international"),
     ("rss", "Middle East Eye", "https://www.middleeasteye.net/rss", "en", "international"),
     ("rss", "IRNA English", "https://en.irna.ir/rss", "en", "iran"),
     ("rss", "Tehran Times", "https://www.tehrantimes.com/rss", "en", "iran"),
     ("rss", "Press TV", "https://www.presstv.ir/rss.xml", "en", "iran"),
     ("gdelt", "Reuters (via GDELT)", 'domain:reuters.com (Iran OR Tehran OR UNESCO OR diplomacy OR "Middle East")', "en", "international"),
     ("gdelt", "AP (via GDELT)", 'domain:apnews.com (Iran OR Tehran OR UNESCO OR diplomacy OR "Middle East")', "en", "international"),
+    ("gdelt", "UN News (via GDELT)", "domain:news.un.org", "en", "international"),
     ("gdelt", "Iran in world media (GDELT)", "Iran sourcelang:english", "en", "iran"),
 ]  # fmt: skip
 
