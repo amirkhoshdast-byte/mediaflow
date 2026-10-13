@@ -3,9 +3,13 @@ Personas and pillars are working defaults; SPEC does not enumerate them."""
 
 CATEGORIES = [
     "diplomacy", "economy", "culture", "science_tech", "law", "energy",
-    "humanitarian", "media", "military", "security", "judicial", "other",
+    "humanitarian", "media", "military", "security", "judicial", "politics", "international",
+    "society", "information_war", "other",
 ]  # fmt: skip
 SENSITIVE_CATEGORIES = {"military", "security", "judicial"}
+# Publication zones from the voice guide, plus "rebuttal": a sourced correction of false claims
+# about Iran (needs the President's Office, see analysis.normalize_analysis).
+ZONES = ["green", "yellow", "red", "rebuttal"]
 
 PERSONAS = ["diplomat", "analyst", "civilizational_narrator"]
 PILLARS = [

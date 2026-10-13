@@ -1,22 +1,45 @@
 """Pure post-processing of model output. Models propose; these rules enforce SPEC section 5."""
 
-from app.catalog import CATEGORIES, SENSITIVE_CATEGORIES, TWEET_HARD_LIMIT, TWEET_SOFT_LIMIT
+from app.catalog import (
+    CATEGORIES,
+    SENSITIVE_CATEGORIES,
+    TWEET_HARD_LIMIT,
+    TWEET_SOFT_LIMIT,
+    ZONES,
+)
 from app.enums import RISK_ORDER, Approach, RiskLevel
 
 _APPROACHES = {a.value for a in Approach}
 _RISKS = {r.value for r in RiskLevel}
 
 
+def _at_least(risk: str, floor: RiskLevel) -> str:
+    return floor.value if RISK_ORDER[RiskLevel(risk)] < RISK_ORDER[floor] else risk
+
+
 def normalize_analysis(data: dict) -> dict:
     category = data.get("category") if data.get("category") in CATEGORIES else "other"
     risk = data.get("risk") if data.get("risk") in _RISKS else "medium"
     approach = data.get("approach") if data.get("approach") in _APPROACHES else "monitor_only"
+    zone = data.get("zone") if data.get("zone") in ZONES else None
     if category in SENSITIVE_CATEGORIES:
+        zone = "red"
+    elif zone is None:
+        zone = "rebuttal" if category == "information_war" else "green"
+    if zone == "red":
         # Military / security / judicial: never default to engagement, and never low risk.
         if approach not in {Approach.MONITOR_ONLY, Approach.STRATEGIC_SILENCE}:
             approach = Approach.MONITOR_ONLY.value
-        if RISK_ORDER[RiskLevel(risk)] < RISK_ORDER[RiskLevel.HIGH]:
-            risk = RiskLevel.HIGH.value
+        risk = _at_least(risk, RiskLevel.HIGH)
+    elif zone == "rebuttal":
+        # A public correction on Iran's behalf is a high-stakes statement: President's Office only.
+        risk = _at_least(risk, RiskLevel.HIGH)
+    elif zone == "yellow":
+        risk = _at_least(risk, RiskLevel.MEDIUM)
+    try:
+        relevance = max(0, min(100, int(data.get("relevance", 50))))
+    except (TypeError, ValueError):
+        relevance = 50
     try:
         sentiment = max(-1.0, min(1.0, float(data.get("sentiment", 0))))
     except (TypeError, ValueError):
@@ -30,6 +53,8 @@ def normalize_analysis(data: dict) -> dict:
         "approach": approach,
         "opportunity": str(data.get("opportunity") or "") or None,
         "sentiment": sentiment,
+        "zone": zone,
+        "relevance": relevance,
     }
 
 

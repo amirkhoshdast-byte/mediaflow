@@ -29,6 +29,8 @@ export interface Signal {
   approach: string | null;
   opportunity: string | null;
   sentiment: number | null;
+  zone: "green" | "yellow" | "red" | "rebuttal" | null;
+  relevance: number | null;
   error: string | null;
   text: string;
   url: string | null;

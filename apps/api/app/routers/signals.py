@@ -34,6 +34,8 @@ def serialize_signal(s: Signal) -> dict:
         "approach": s.approach,
         "opportunity": s.opportunity,
         "sentiment": s.sentiment,
+        "zone": s.zone,
+        "relevance": s.relevance,
         "error": s.error,
         "text": s.raw_item.text,
         "url": s.raw_item.url,

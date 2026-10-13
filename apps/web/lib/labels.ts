@@ -53,6 +53,10 @@ export const CATEGORY_FA: Record<string, string> = {
   military: "نظامی",
   security: "امنیتی",
   judicial: "قضایی",
+  politics: "سیاست",
+  international: "بین‌الملل",
+  society: "اجتماع",
+  information_war: "جنگ روایت",
   other: "سایر",
 };
 export const PERSONA_FA: Record<string, string> = {
@@ -112,4 +116,17 @@ export const DOC_STATUS_FA: Record<string, string> = {
 export const RED_KIND_FA: Record<string, string> = {
   topic: "موضوع",
   phrase: "عبارت",
+};
+
+export const ZONE_FA: Record<string, string> = {
+  green: "ورود فعال",
+  yellow: "با قاب فرهنگی",
+  red: "سکوت راهبردی",
+  rebuttal: "روایت و پاسخ",
+};
+export const ZONE_CLASS: Record<string, string> = {
+  green: "border-ok text-ok",
+  yellow: "border-warn text-warn",
+  red: "border-danger text-danger",
+  rebuttal: "border-accent text-accent",
 };

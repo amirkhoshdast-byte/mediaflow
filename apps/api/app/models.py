@@ -90,6 +90,8 @@ class Signal(Base):
     approach: Mapped[str | None] = mapped_column(String(32), nullable=True)
     opportunity: Mapped[str | None] = mapped_column(Text, nullable=True)
     sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)  # -1..1
+    zone: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    relevance: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0..100
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _ts()
 

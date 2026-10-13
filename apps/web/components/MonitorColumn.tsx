@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { api } from "@/lib/api";
-import { APPROACH_FA, CATEGORY_FA, faError } from "@/lib/labels";
+import { APPROACH_FA, CATEGORY_FA, ZONE_CLASS, ZONE_FA, faError } from "@/lib/labels";
 import type { Me, Signal } from "@/lib/types";
 import { RiskBadge } from "./DraftCard";
 
@@ -105,6 +105,9 @@ export function MonitorColumn({
                 <>
                   <h3 className="text-sm font-bold leading-6">{s.title}</h3>
                   <div className="flex flex-wrap gap-1.5 text-xs">
+                    {s.zone && (
+                      <span className={`badge ${ZONE_CLASS[s.zone]}`}>{ZONE_FA[s.zone]}</span>
+                    )}
                     {s.risk && <RiskBadge risk={s.risk} />}
                     {s.approach && (
                       <span className="badge border-accent text-accent">
