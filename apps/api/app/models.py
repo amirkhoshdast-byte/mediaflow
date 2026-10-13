@@ -193,3 +193,15 @@ class KnowledgeChunk(Base):
     position: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBED_DIM), nullable=True)
+
+
+class RedLine(Base):
+    __tablename__ = "red_lines"
+    id: Mapped[str] = _id()
+    kind: Mapped[str] = mapped_column(String(8))
+    pattern: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    severity: Mapped[str] = mapped_column(String(16))  # a RiskLevel: the floor it sets on a draft
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = _ts()

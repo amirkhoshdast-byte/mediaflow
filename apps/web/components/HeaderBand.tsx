@@ -120,6 +120,9 @@ export function HeaderBand({
           <span className="text-sm">
             {me.display_name} <span className="text-muted">· {ROLE_FA[me.role]}</span>
           </span>
+          <Link href="/redlines" className="btn">
+            خطوط قرمز
+          </Link>
           <Link href="/knowledge" className="btn">
             پایگاه دانش
           </Link>

@@ -77,3 +77,8 @@ class DocStatus(StrEnum):
     PROCESSING = "processing"
     READY = "ready"
     FAILED = "failed"
+
+
+class RedLineKind(StrEnum):
+    TOPIC = "topic"  # judged semantically (tone review); needs a model
+    PHRASE = "phrase"  # exact wording, matched case-insensitively

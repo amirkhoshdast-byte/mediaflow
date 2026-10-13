@@ -94,3 +94,12 @@ export interface KbHit {
   text: string;
   score: number;
 }
+
+export interface RedLine {
+  id: string;
+  kind: "topic" | "phrase";
+  pattern: string;
+  description: string | null;
+  severity: Risk;
+  active: boolean;
+}

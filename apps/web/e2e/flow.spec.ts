@@ -6,7 +6,11 @@ const NEWS =
   "The central bank announced on Monday that it will keep its benchmark interest rate unchanged " +
   "for a third consecutive meeting, citing slowing inflation and uncertainty in global energy markets.";
 
+// 2FA secrets of accounts enrolled earlier in this run, so a user can sign in again in a later test.
+const knownSecrets = new Map<string, string>();
+
 async function signIn(page: Page, username: string, password: string, secret?: string) {
+  secret ??= knownSecrets.get(username);
   await page.goto("/login");
   await page.getByLabel("نام کاربری").fill(username);
   await page.getByLabel("گذرواژه").fill(password);
@@ -14,6 +18,7 @@ async function signIn(page: Page, username: string, password: string, secret?: s
   if (!secret) {
     // First login: 2FA enrolment is forced; read the manual key shown next to the QR code.
     secret = (await page.locator("code").innerText()).trim();
+    knownSecrets.set(username, secret);
   }
   await page.getByLabel("کد ۶‌رقمی برنامه احراز هویت").fill(totp(secret));
   await page.getByRole("button", { name: /فعال‌سازی و ورود|^ورود$/ }).click();
@@ -143,4 +148,23 @@ test("knowledge base: upload, search, and sensitive documents fail closed", asyn
   await upload("secret", "پروتکل داخلی بحران: تماس با دفتر رئیس.", "sensitive");
   await expect(docs.getByText("ناموفق")).toBeVisible({ timeout: 20_000 });
   await expect(docs.getByText("آماده")).toHaveCount(1);
+});
+
+test("red lines: reviewers edit the list, other roles only read it", async ({ browser }) => {
+  const editor = await userPage(browser, "e2e-editor", PASSWORD);
+  await editor.getByRole("link", { name: "خطوط قرمز" }).click();
+  await expect(editor.getByRole("heading", { name: "خطوط قرمز", level: 1 })).toBeVisible();
+  await expect(editor.getByText("عملیات نظامی")).toBeVisible(); // starter list from the voice guide
+
+  await editor.getByPlaceholder("موضوع یا عبارت").fill("تحریم‌های بانکی");
+  await editor.getByRole("button", { name: "افزودن" }).click();
+  const item = editor.getByRole("listitem").filter({ hasText: "تحریم‌های بانکی" });
+  await expect(item).toBeVisible();
+  await item.getByRole("button", { name: "غیرفعال" }).click();
+  await expect(item.getByRole("button", { name: "فعال‌سازی" })).toBeVisible();
+
+  const lead = await userPage(browser, "e2e-lead", PASSWORD);
+  await lead.goto("/redlines");
+  await expect(lead.getByText("تحریم‌های بانکی")).toBeVisible();
+  await expect(lead.getByRole("button", { name: "افزودن" })).toHaveCount(0);
 });
