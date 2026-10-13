@@ -23,6 +23,7 @@ TASK_SLOT = {
     "signal_analysis": "classify",
     "content_generation": "generate",
     "tone_review": "generate",
+    "daily_brief": "generate",
     "embedding": "embed",
 }
 

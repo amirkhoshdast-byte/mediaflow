@@ -1,10 +1,11 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -229,4 +230,31 @@ class ToneReview(Base):
     suggested_parts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = _ts()
+
+
+class DailyReport(Base):
+    """Intelligence report for one slot of the day (08:00 and 16:00 Tehran) or a manual run."""
+
+    __tablename__ = "daily_reports"
+    id: Mapped[str] = _id()
+    slot: Mapped[str] = mapped_column(String(16))  # morning | afternoon | manual
+    report_date: Mapped[date] = mapped_column(Date)  # the Tehran calendar day
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    content: Mapped[dict] = mapped_column(JSON)  # sections built from data, never from the model
+    brief: Mapped[str | None] = mapped_column(Text, nullable=True)  # model-written summary
+    brief_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = _ts()
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id: Mapped[str] = _id()
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    link: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _ts()

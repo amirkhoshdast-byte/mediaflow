@@ -120,6 +120,7 @@ class FakeProvider(Provider):
         self.calls: list[tuple[str, str]] = []
         self.embed_calls: list[list[str]] = []
         self.review: dict | Exception = {"score": 82, "issues": [], "suggested_parts": None}
+        self.brief: str | Exception = "خلاصه آزمون برای این بازه."
         self.analysis = {
             "title": "عنوان آزمون",
             "summary": "خلاصه آزمون.",
@@ -137,6 +138,10 @@ class FakeProvider(Provider):
 
     def complete(self, system, user, *, model, max_tokens):
         self.calls.append((system, user))
+        if "Items from the period" in user:
+            if isinstance(self.brief, Exception):
+                raise self.brief
+            return self.brief
         if "Review this draft" in user:
             if isinstance(self.review, Exception):
                 raise self.review

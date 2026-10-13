@@ -11,7 +11,18 @@ from app.db import SessionLocal
 from app.enums import Role
 from app.models import User
 from app.red_lines import seed_red_lines
-from app.routers import auth, drafts, intel, knowledge, meta, red_lines, signals, sources, users
+from app.routers import (
+    auth,
+    drafts,
+    intel,
+    knowledge,
+    meta,
+    red_lines,
+    reports,
+    signals,
+    sources,
+    users,
+)
 from app.security import hash_password
 from app.sources import seed_sources
 
@@ -68,6 +79,7 @@ app.include_router(knowledge.router)
 app.include_router(red_lines.router)
 app.include_router(sources.router)
 app.include_router(intel.router)
+app.include_router(reports.router)
 
 
 @app.get("/health")

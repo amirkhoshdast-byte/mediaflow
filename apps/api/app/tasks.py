@@ -20,6 +20,7 @@ from app.models import (
     Source,
     ToneReview,
 )
+from app.reports import due_slots, generate_report
 from app.tone import clean_model_review, draft_for_prompt, topics_for_prompt
 
 log = logging.getLogger("ncr.tasks")
@@ -134,3 +135,20 @@ def review_draft(review_id: str) -> None:
             review.status = "failed"
             review.error = f"{e.__class__.__name__}: {str(e)[:300]}"
         db.commit()
+
+
+@celery.task(name="reports.generate")
+def generate_scheduled_report(slot: str) -> str | None:
+    with SessionLocal() as db:
+        report = generate_report(db, get_gateway(), get_settings(), slot)
+        return report.id if report else None
+
+
+@celery.task(name="reports.catch_up")
+def catch_up_reports() -> list[str]:
+    """Create a slot's report if its time passed (within 6 hours) and it was never made."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(ZoneInfo(get_settings().timezone))
+    return [slot for slot in due_slots(now) if generate_scheduled_report(slot)]

@@ -17,6 +17,7 @@ class Perm(StrEnum):
     PROMPTS_MANAGE = "prompts:manage"
     KB_MANAGE = "kb:manage"
     REDLINE_MANAGE = "redline:manage"
+    REPORT_RUN = "report:run"
     KB_READ_SENSITIVE = "kb:read_sensitive"
     USERS_MANAGE = "users:manage"
     AUDIT_VIEW = "audit:view"
@@ -24,11 +25,16 @@ class Perm(StrEnum):
 
 R = Role
 PERMISSIONS: dict[Role, set[Perm]] = {
-    R.TREND_ANALYST: {Perm.SOURCES_MANAGE, Perm.SIGNAL_ADD},
+    R.TREND_ANALYST: {Perm.SOURCES_MANAGE, Perm.SIGNAL_ADD, Perm.REPORT_RUN},
     R.MEDIA_MONITOR: {Perm.SIGNAL_ADD},
     R.AI_OPERATOR: {Perm.PROMPTS_MANAGE, Perm.KB_MANAGE, Perm.KB_READ_SENSITIVE},
     R.CONTENT_LEAD: {Perm.SIGNAL_ADD, Perm.DRAFT_EDIT, Perm.DRAFT_SUBMIT, Perm.DRAFT_PUBLISH},
-    R.NARRATIVE_STRATEGIST: {Perm.SIGNAL_ADD, Perm.DRAFT_EDIT, Perm.DRAFT_PUBLISH},
+    R.NARRATIVE_STRATEGIST: {
+        Perm.SIGNAL_ADD,
+        Perm.DRAFT_EDIT,
+        Perm.DRAFT_PUBLISH,
+        Perm.REPORT_RUN,
+    },
     R.DIPLOMATIC_EDITOR: {
         Perm.DRAFT_EDIT,
         Perm.DRAFT_LOWER_RISK,
@@ -41,6 +47,7 @@ PERMISSIONS: dict[Role, set[Perm]] = {
         Perm.APPROVE_HIGH_CRITICAL,
         Perm.KB_READ_SENSITIVE,
         Perm.REDLINE_MANAGE,
+        Perm.REPORT_RUN,
         Perm.AUDIT_VIEW,
     },
     # System admin manages users/settings but can never approve content.
