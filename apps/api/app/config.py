@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     # AI gateway
     ai_provider_classify: str = "ollama"
     ai_provider_generate: str = "anthropic"
-    ai_provider_embed: str = "ollama"
     ai_provider_sensitive: str = "ollama"
     ai_timeout_seconds: float = 60.0
 
@@ -31,10 +30,8 @@ class Settings(BaseSettings):
     openai_compat_base_url: str = ""
     openai_compat_api_key: str = ""
     openai_compat_model: str = ""
-    openai_compat_embed_model: str = ""
     ollama_base_url: str = "http://ollama:11434"
     ollama_model: str = "qwen2.5:7b-instruct"
-    ollama_embed_model: str = "bge-m3"
 
     # Automatic ingestion (RSS / GDELT). Caps bound model spend if a feed floods.
     ingest_enabled: bool = True
@@ -44,10 +41,6 @@ class Settings(BaseSettings):
     ingest_max_new_per_day: int = 300
     ingest_undated_per_run: int = 5  # feeds without dates would otherwise replay their archive
     gdelt_min_interval_seconds: float = 6.0  # GDELT answers 429 to faster callers
-
-    # Knowledge base retrieval for content generation
-    kb_context_chunks: int = 4
-    kb_min_score: float = 0.3
 
     # Daily targets shown in the header band
     target_posts_per_day: int = 3

@@ -130,9 +130,6 @@ export function HeaderBand({
           <Link href="/redlines" className="btn">
             خطوط قرمز
           </Link>
-          <Link href="/knowledge" className="btn">
-            پایگاه دانش
-          </Link>
           {me.permissions.includes("users:manage") && (
             <Link href="/admin" className="btn">
               مدیریت

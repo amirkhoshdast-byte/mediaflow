@@ -18,7 +18,7 @@ with psycopg.connect(
 
 import pyotp  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import select, text  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 from app import models  # noqa: E402,F401
 from app.db import Base, SessionLocal, engine  # noqa: E402
@@ -32,8 +32,6 @@ PASSWORD = "test-password-123"
 
 @pytest.fixture(autouse=True)
 def clean_db():
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield
@@ -101,24 +99,10 @@ from app.celery_app import celery  # noqa: E402
 celery.conf.task_always_eager = True
 
 
-def _fake_vector(text: str) -> list[float]:
-    """Hashed bag of words: texts sharing words are close, so search tests rank meaningfully."""
-    import math
-    import re
-    import zlib
-
-    v = [0.0] * 1024
-    for word in re.findall(r"\w+", text.lower()):
-        v[zlib.crc32(word.encode()) % 1024] += 1.0
-    norm = math.sqrt(sum(x * x for x in v)) or 1.0
-    return [x / norm for x in v]
-
-
 class FakeProvider(Provider):
     def __init__(self, name: str, is_local: bool):
         self.name, self.is_local = name, is_local
         self.calls: list[tuple[str, str]] = []
-        self.embed_calls: list[list[str]] = []
         self.review: dict | Exception = {"score": 82, "issues": [], "suggested_parts": None}
         self.brief: str | Exception = "خلاصه آزمون برای این بازه."
         self.analysis = {
@@ -131,10 +115,6 @@ class FakeProvider(Provider):
             "opportunity": "فرصت",
             "sentiment": 0.2,
         }
-
-    def embed(self, texts):
-        self.embed_calls.append(texts)
-        return [_fake_vector(t) for t in texts]
 
     def complete(self, system, user, *, model, max_tokens):
         self.calls.append((system, user))

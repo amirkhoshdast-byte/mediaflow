@@ -77,26 +77,6 @@ export interface Stats {
   stages: Record<Stage, number>;
 }
 
-export interface KbDoc {
-  id: string;
-  title: string;
-  doc_type: string;
-  sensitivity: "normal" | "sensitive";
-  filename: string;
-  status: "processing" | "ready" | "failed";
-  error: string | null;
-  chunks: number;
-  created_at: string;
-}
-export interface KbHit {
-  doc_id: string;
-  title: string;
-  doc_type: string;
-  sensitivity: string;
-  text: string;
-  score: number;
-}
-
 export interface RedLine {
   id: string;
   kind: "topic" | "phrase";

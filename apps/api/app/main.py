@@ -15,7 +15,6 @@ from app.routers import (
     auth,
     drafts,
     intel,
-    knowledge,
     meta,
     red_lines,
     reports,
@@ -75,7 +74,6 @@ app.include_router(users.router)
 app.include_router(signals.router)
 app.include_router(drafts.router)
 app.include_router(meta.router)
-app.include_router(knowledge.router)
 app.include_router(red_lines.router)
 app.include_router(sources.router)
 app.include_router(intel.router)

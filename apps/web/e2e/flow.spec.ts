@@ -121,40 +121,6 @@ test("signal → draft → approval → published", async ({ browser }) => {
   ).toHaveCount(0);
 });
 
-test("knowledge base: upload, search, and sensitive documents fail closed", async ({ browser }) => {
-  const op = await userPage(browser, "e2e-operator", PASSWORD);
-  await op.getByRole("link", { name: "پایگاه دانش" }).click();
-  await expect(op.getByRole("heading", { name: "پایگاه دانش", level: 1 })).toBeVisible();
-
-  const upload = async (name: string, text: string, sensitivity: string) => {
-    await op.locator('input[type="file"]').setInputFiles({
-      name: `${name}.txt`,
-      mimeType: "text/plain",
-      buffer: Buffer.from(text),
-    });
-    await op.getByLabel("طبقه حساسیت").first().selectOption(sensitivity);
-    await op.getByRole("button", { name: "بارگذاری سند" }).click();
-  };
-
-  await upload("identity", "تمدن ایرانی بر گفت‌وگو و حافظه مشترک بنا شده است.", "normal");
-  const docs = op.getByRole("list", { name: "اسناد" });
-  await expect(docs.getByText("آماده")).toBeVisible({ timeout: 20_000 });
-
-  await op
-    .getByRole("searchbox", { name: "جست‌وجو" })
-    .or(op.getByLabel("جست‌وجو"))
-    .fill("حافظه مشترک");
-  await op.getByRole("button", { name: "جست‌وجو" }).click();
-  await expect(
-    op.getByRole("region", { name: "نتایج جست‌وجو" }).getByText("identity.txt"),
-  ).toBeVisible();
-
-  // This stack has no local model, so a sensitive document must fail instead of going to the cloud.
-  await upload("secret", "پروتکل داخلی بحران: تماس با دفتر رئیس.", "sensitive");
-  await expect(docs.getByText("ناموفق")).toBeVisible({ timeout: 20_000 });
-  await expect(docs.getByText("آماده")).toHaveCount(1);
-});
-
 test("red lines: reviewers edit the list, other roles only read it", async ({ browser }) => {
   const editor = await userPage(browser, "e2e-editor", PASSWORD);
   await editor.getByRole("link", { name: "خطوط قرمز" }).click();

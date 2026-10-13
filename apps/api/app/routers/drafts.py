@@ -12,11 +12,9 @@ from app.ai import SensitiveRoutingError, get_gateway
 from app.ai.gateway import extract_json
 from app.analysis import check_parts, clean_variants
 from app.catalog import LANGUAGES, PERSONAS, PILLARS
-from app.config import get_settings
 from app.db import get_db
 from app.deps import current_user, require
 from app.enums import RISK_ORDER, Decision, DraftFormat, RiskLevel, Stage
-from app.knowledge import format_positions, retrieve_positions
 from app.models import Approval, Draft, DraftVersion, RedLine, Signal, ToneReview, User
 from app.permissions import Perm, can_approve, has_perm
 from app.tasks import review_draft
@@ -79,18 +77,11 @@ def generate(
     else:
         source = body.topic.strip()
 
-    hits: list[dict] = []
-    try:
-        hits = retrieve_positions(db, get_gateway(), source, get_settings())
-    except Exception:  # noqa: BLE001 - missing context must not block drafting
-        log.warning("knowledge retrieval failed; generating without positions", exc_info=True)
-
     try:
         result = get_gateway().run(
             db,
             "content_generation",
             {
-                "positions": format_positions(hits),
                 "format": body.format.value,
                 "language": body.language,
                 "persona": body.persona,
@@ -127,10 +118,7 @@ def generate(
         db.flush()
         db.add(DraftVersion(draft_id=d.id, parts=d.parts, author_type="ai", author_id=None))
         drafts.append(d)
-    audit.log(
-        db, user.id, "draft.generated", "draft", group,
-        {"count": len(drafts), "kb_docs": sorted({h["doc_id"] for h in hits})},
-    )  # fmt: skip
+    audit.log(db, user.id, "draft.generated", "draft", group, {"count": len(drafts)})
     db.commit()
     return [serialize_draft(d) for d in drafts]
 

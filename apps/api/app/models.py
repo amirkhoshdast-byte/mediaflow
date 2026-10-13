@@ -1,7 +1,6 @@
 import uuid
 from datetime import UTC, date, datetime
 
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -9,7 +8,6 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
-    Index,
     Integer,
     String,
     Text,
@@ -18,8 +16,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-
-EMBED_DIM = 1024  # bge-m3; changing the embedding model to another size needs a migration
 
 
 def now() -> datetime:
@@ -168,39 +164,6 @@ class PromptTemplate(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = _ts()
-
-
-class KnowledgeDoc(Base):
-    __tablename__ = "knowledge_docs"
-    id: Mapped[str] = _id()
-    title: Mapped[str] = mapped_column(String(300))
-    doc_type: Mapped[str] = mapped_column(String(16))
-    sensitivity: Mapped[str] = mapped_column(String(16), default="normal")
-    filename: Mapped[str] = mapped_column(String(300))
-    status: Mapped[str] = mapped_column(String(16), default="processing")
-    error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    embed_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    created_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = _ts()
-
-
-class KnowledgeChunk(Base):
-    __tablename__ = "knowledge_chunks"
-    __table_args__ = (
-        Index(
-            "ix_knowledge_chunks_embedding",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-        ),
-    )
-    id: Mapped[str] = _id()
-    doc_id: Mapped[str] = mapped_column(
-        ForeignKey("knowledge_docs.id", ondelete="CASCADE"), index=True
-    )
-    position: Mapped[int] = mapped_column(Integer)
-    text: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBED_DIM), nullable=True)
 
 
 class RedLine(Base):
