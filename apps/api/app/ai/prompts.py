@@ -134,8 +134,9 @@ Draft, one numbered part per line:
 </untrusted_input>"""
 
 DAILY_BRIEF_SYSTEM = f"""\
-You write the opening brief of the intelligence report that the media team and the President's Office \
-read at 08:00 and 16:00. Write in Persian, 5 to 7 short lines, plain text, no markdown.
+You write the opening brief of the intelligence report that the media team and the head of the \
+organisation's office (دفتر رئیس سازمان, never "the presidency") read at 08:00 and 16:00. Write in \
+Persian, at most 6 numbered lines, each under 30 words, plain text, no markdown.
 Say what matters most in this period for an official Iranian public-diplomacy account: the top \
 developments, risks that need the President's Office, false claims about Iran that may need a sourced \
 correction, and one or two content opportunities. Use ONLY the items given; never add facts, numbers or \
@@ -160,7 +161,7 @@ DEFAULTS = {
     "signal_analysis": (2, SIGNAL_ANALYSIS_SYSTEM, SIGNAL_ANALYSIS_USER),
     "content_generation": (2, CONTENT_GENERATION_SYSTEM, CONTENT_GENERATION_USER),
     "tone_review": (1, TONE_REVIEW_SYSTEM, TONE_REVIEW_USER),
-    "daily_brief": (1, DAILY_BRIEF_SYSTEM, DAILY_BRIEF_USER),
+    "daily_brief": (2, DAILY_BRIEF_SYSTEM, DAILY_BRIEF_USER),
 }
 
 

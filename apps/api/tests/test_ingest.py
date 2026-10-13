@@ -161,8 +161,24 @@ def test_other_schemes_and_unresolvable_hosts_are_refused(monkeypatch):
         raise socket.gaierror("nope")
 
     monkeypatch.setattr(socket, "getaddrinfo", nxdomain)
+    monkeypatch.setattr(ingest.time, "sleep", lambda s: None)
     with pytest.raises(ingest.UnsafeUrl):
         ingest.check_public_url("http://api:8000/admin")
+
+
+def test_a_brief_dns_failure_is_retried(monkeypatch):
+    calls = []
+
+    def flaky(*a, **k):
+        calls.append(1)
+        if len(calls) < 3:
+            raise socket.gaierror("temporary")
+        return [(socket.AF_INET, 0, 0, "", ("93.184.216.34", 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", flaky)
+    monkeypatch.setattr(ingest.time, "sleep", lambda s: None)
+    ingest.check_public_url("https://feed.example/rss")
+    assert len(calls) == 3
 
 
 def test_public_address_is_allowed(monkeypatch):
@@ -237,10 +253,15 @@ def test_atom_feeds_are_parsed_too():
 
 
 def test_feeds_without_dates_cannot_replay_their_archive(feeds):
-    body = "".join(f"<item><title>archive {i}</title><link>https://a.example/{i}</link></item>" for i in range(30))
+    body = "".join(
+        f"<item><title>archive {i}</title><link>https://a.example/{i}</link></item>"
+        for i in range(30)
+    )
     feeds["https://a.example/rss"] = f"<rss><channel>{body}</channel></rss>".encode()
     with SessionLocal() as db:
-        assert len(ingest.ingest_source(db, _source(db), _settings(ingest_undated_per_run=5), 40)) == 5
+        assert (
+            len(ingest.ingest_source(db, _source(db), _settings(ingest_undated_per_run=5), 40)) == 5
+        )
 
 
 def test_budget_is_shared_so_late_sources_are_not_starved(feeds):
@@ -252,7 +273,9 @@ def test_budget_is_shared_so_late_sources_are_not_starved(feeds):
         db.query(Source).delete()
         for name in ("A", "B", "C", "D"):
             _source(db, name, f"https://{name.lower()}.example/rss")
-        ids = ingest.ingest_all(db, _settings(ingest_max_new_per_run=8, gdelt_min_interval_seconds=0))
+        ids = ingest.ingest_all(
+            db, _settings(ingest_max_new_per_run=8, gdelt_min_interval_seconds=0)
+        )
         by_source = {db.get(Signal, i).raw_item.text[0] for i in ids}
     assert len(ids) == 8 and by_source == {"A", "B", "C", "D"}
 

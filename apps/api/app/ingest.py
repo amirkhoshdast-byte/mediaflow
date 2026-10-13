@@ -27,8 +27,11 @@ from app.models import RawItem, Signal, Source
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_REDIRECTS = 3
+DNS_ATTEMPTS = 3
 USER_AGENT = "Mozilla/5.0 (compatible; NarrativeCommandRoom/1.0; public-media-monitor)"
-ACCEPT = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5"
+ACCEPT = (
+    "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5"
+)
 
 
 class UnsafeUrl(ValueError):
@@ -47,10 +50,14 @@ def check_public_url(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise UnsafeUrl("only http(s) URLs are allowed")
-    try:
-        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
-    except socket.gaierror as e:
-        raise UnsafeUrl("host does not resolve") from e
+    for attempt in range(DNS_ATTEMPTS):
+        try:
+            infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+            break
+        except socket.gaierror as e:
+            if attempt == DNS_ATTEMPTS - 1:
+                raise UnsafeUrl("host does not resolve") from e
+            time.sleep(1)  # Docker's resolver is briefly unavailable right after a restart
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if not ip.is_global:
@@ -227,7 +234,9 @@ def ingest_source(db: Session, source: Source, settings: Settings, budget: int) 
 def ingest_all(db: Session, settings: Settings) -> list[str]:
     """One pass over every active source. The run budget is shared fairly so that sources sorted
     late in the alphabet are not starved by the early ones."""
-    budget = min(settings.ingest_max_new_per_run, settings.ingest_max_new_per_day - _signals_today(db))
+    budget = min(
+        settings.ingest_max_new_per_run, settings.ingest_max_new_per_day - _signals_today(db)
+    )
     sources = list(db.scalars(select(Source).where(Source.active.is_(True)).order_by(Source.name)))
     if budget <= 0 or not sources:
         return []

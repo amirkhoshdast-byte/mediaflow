@@ -133,7 +133,7 @@ def write_brief(db: Session, gateway: AIGateway, content: dict, start: datetime,
             ),
             "items": json.dumps(items, ensure_ascii=False),
         },
-        max_tokens=700,
+        max_tokens=1500,
     )
     return result.text.strip()
 
