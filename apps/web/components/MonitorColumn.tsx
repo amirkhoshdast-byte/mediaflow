@@ -25,6 +25,14 @@ export function MonitorColumn({
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const canAdd = me.permissions.includes("signal:add");
+  const [zone, setZone] = useState("all");
+  const [showLow, setShowLow] = useState(false);
+  // Analysing/failed items always show; analysed ones can be narrowed by zone and relevance.
+  const visible = signals.filter(
+    (s) =>
+      s.status !== "ready" ||
+      ((zone === "all" || s.zone === zone) && (showLow || (s.relevance ?? 50) >= 30)),
+  );
 
   async function add(e: FormEvent) {
     e.preventDefault();
@@ -73,9 +81,29 @@ export function MonitorColumn({
         </form>
       )}
 
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <select
+          aria-label="منطقه"
+          className="input !w-auto !py-1"
+          value={zone}
+          onChange={(e) => setZone(e.target.value)}
+        >
+          <option value="all">همه منطقه‌ها</option>
+          {Object.entries(ZONE_FA).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={showLow} onChange={(e) => setShowLow(e.target.checked)} />
+          نمایش کم‌ارتباط
+        </label>
+      </div>
+
       <ul className="space-y-2">
-        {signals.length === 0 && <li className="text-sm text-muted">هنوز سیگنالی ثبت نشده است.</li>}
-        {signals.map((s) => (
+        {visible.length === 0 && <li className="text-sm text-muted">هنوز سیگنالی ثبت نشده است.</li>}
+        {visible.map((s) => (
           <li key={s.id}>
             <article
               className={`card space-y-1.5 p-3 ${selectedId === s.id ? "border-accent" : ""}`}

@@ -11,6 +11,7 @@ x-e2e-env: &e2e-env
   AI_PROVIDER_SENSITIVE: ollama
   OLLAMA_BASE_URL: http://unreachable.invalid:11434
   ANTHROPIC_API_KEY: ""
+  INGEST_ENABLED: "false"  # no network in tests
   BOOTSTRAP_ADMIN_USERNAME: e2e-admin
   BOOTSTRAP_ADMIN_PASSWORD: e2e-admin-password-1
 

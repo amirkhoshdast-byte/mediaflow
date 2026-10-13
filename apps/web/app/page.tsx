@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HeaderBand } from "@/components/HeaderBand";
+import { IntelBand } from "@/components/IntelBand";
 import { MonitorColumn } from "@/components/MonitorColumn";
 import { PipelineColumn } from "@/components/PipelineColumn";
 import { StudioColumn } from "@/components/StudioColumn";
@@ -121,6 +122,7 @@ export default function Dashboard() {
   return (
     <>
       <HeaderBand me={me} stats={stats} onLogout={logout} />
+      <IntelBand onPick={pick} refreshKey={signals.length} />
       <nav
         className="sticky top-0 z-10 flex border-b border-line bg-surface lg:hidden"
         aria-label="بخش‌ها"

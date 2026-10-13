@@ -105,3 +105,29 @@ export interface RedLine {
   severity: Risk;
   active: boolean;
 }
+
+export interface IntelOverview {
+  window_hours: number;
+  total: number;
+  analyzing: number;
+  failed: number;
+  hidden_low_relevance: number;
+  by_zone: Record<string, number>;
+  by_category: Record<string, number>;
+  top: Signal[];
+  high_risk: Signal[];
+  rebuttals: Signal[];
+  sources: { active: number; failing: number; last_fetch: string | null };
+}
+export interface Source {
+  id: string;
+  type: "rss" | "gdelt";
+  name: string;
+  url: string | null;
+  query: string | null;
+  language: string;
+  domain: string | null;
+  active: boolean;
+  last_fetched_at: string | null;
+  last_error: string | null;
+}

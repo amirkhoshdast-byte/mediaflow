@@ -7,6 +7,8 @@ const analysis = {
   category: "economy",
   region: "اروپا",
   risk: "low",
+  zone: "green",
+  relevance: 80,
   approach: "original_post",
   opportunity: "تحلیل آرام درباره ثبات سیاست پولی",
   sentiment: 0.1,

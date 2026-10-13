@@ -50,6 +50,8 @@ test.beforeAll(async ({ browser }) => {
     ["e2e-lead", "content_lead"],
     ["e2e-editor", "diplomatic_editor"],
     ["e2e-operator", "ai_operator"],
+    ["e2e-analyst", "trend_analyst"],
+    ["e2e-strategist", "narrative_strategist"],
   ]) {
     const r = await page.request.post("/api/admin/users", {
       headers: { "x-ncr": "1" },
@@ -167,4 +169,46 @@ test("red lines: reviewers edit the list, other roles only read it", async ({ br
   await lead.goto("/redlines");
   await expect(lead.getByText("تحریم‌های بانکی")).toBeVisible();
   await expect(lead.getByRole("button", { name: "افزودن" })).toHaveCount(0);
+});
+
+test("morning overview lists analysed signals and sends one to the studio", async ({ browser }) => {
+  const strategist = await userPage(browser, "e2e-strategist", PASSWORD);
+  await strategist
+    .getByRole("textbox", { name: "متن خبر یا توییت" })
+    .fill(
+      "The central bank signalled a pause in rate decisions while regional exporters asked for clearer currency guidance this week.",
+    );
+  await strategist.getByRole("button", { name: "افزودن و تحلیل" }).click();
+
+  const overview = strategist.getByRole("region", { name: /مرور هوشمند/ });
+  const row = overview
+    .getByRole("listitem")
+    .filter({ hasText: "بانک مرکزی نرخ بهره را ثابت نگه داشت" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.getByText("ورود فعال")).toBeVisible();
+  await row.getByRole("button", { name: "تولید محتوا" }).click();
+  await expect(strategist.getByRole("button", { name: "تولید سه پیشنهاد" })).toBeVisible();
+});
+
+test("sources: analysts manage them, other roles only see health", async ({ browser }) => {
+  const analyst = await userPage(browser, "e2e-analyst", PASSWORD);
+  await analyst.getByRole("link", { name: "منابع" }).click();
+  await expect(analyst.getByRole("heading", { name: "منابع رصد", level: 1 })).toBeVisible();
+  const list = analyst.getByRole("list", { name: "منابع" });
+  await expect(list.getByText("BBC World")).toBeVisible(); // starter list
+
+  await analyst.getByPlaceholder("نام منبع").fill("منبع آزمایشی");
+  await analyst
+    .getByPlaceholder("https://example.com/rss.xml")
+    .fill("https://example.com/feed.xml");
+  await analyst.getByRole("button", { name: "افزودن منبع" }).click();
+  const item = list.getByRole("listitem").filter({ hasText: "منبع آزمایشی" });
+  await expect(item).toBeVisible();
+  await item.getByRole("button", { name: "غیرفعال" }).click();
+  await expect(item.getByRole("button", { name: "فعال‌سازی" })).toBeVisible();
+
+  const lead = await userPage(browser, "e2e-lead", PASSWORD);
+  await lead.goto("/sources");
+  await expect(lead.getByText("منبع آزمایشی")).toBeVisible();
+  await expect(lead.getByRole("button", { name: "افزودن منبع" })).toHaveCount(0);
 });

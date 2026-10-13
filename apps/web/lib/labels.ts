@@ -83,6 +83,8 @@ export const ERROR_FA: Record<string, string> = {
   duplicate: "این خبر قبلاً ثبت شده است.",
   forbidden: "دسترسی مجاز نیست.",
   red_line_exists: "این مورد قبلاً در فهرست خطوط قرمز هست.",
+  rss_needs_http_url: "برای RSS آدرس http یا https لازم است.",
+  gdelt_needs_query: "برای GDELT عبارت جست‌وجو لازم است.",
   username_taken: "این نام کاربری قبلاً استفاده شده است.",
   unsupported_file_type: "قالب فایل پشتیبانی نمی‌شود (txt، md، pdf یا docx).",
   file_too_large: "حجم فایل بیش از ۱۰ مگابایت است.",
